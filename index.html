@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="AI短视频提示词创作与资产管理平台，用于沉淀角色、镜头、光影、动作、微表情与提示词资产。"
+    />
+    <title>AI ReelShorts Prompt Control</title>
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="rail" aria-label="主导航">
+        <a class="brand" href="#workbench" aria-label="返回工作台">
+          <span class="brand-mark">AP</span>
+          <span>
+            <strong>Prompt Control</strong>
+            <small>AI ReelShorts</small>
+          </span>
+        </a>
+        <nav class="nav-list" id="mainNav"></nav>
+        <div class="rail-footer">
+          <button class="icon-button" id="themeToggle" type="button" aria-label="切换日夜模式">
+            <i data-lucide="moon"></i>
+          </button>
+          <button class="ghost-button compact" id="exportDataBtn" type="button">
+            <i data-lucide="download"></i>
+            导出
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">AI短视频提示词创作与资产管理工具</p>
+            <h1 id="pageTitle">提示词创建工作台</h1>
+          </div>
+          <div class="topbar-actions">
+            <label class="search-field" for="globalSearch">
+              <i data-lucide="search"></i>
+              <input id="globalSearch" type="search" placeholder="搜索角色、模块、标签、提示词" />
+            </label>
+            <button class="primary-button" id="quickCreateBtn" type="button">
+              <i data-lucide="plus"></i>
+              新建资产
+            </button>
+          </div>
+        </header>
+
+        <section id="appView" class="view-host" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <dialog class="modal" id="entityModal">
+      <form method="dialog" class="modal-card" id="entityForm">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow" id="modalEyebrow">资产编辑</p>
+            <h2 id="modalTitle">新建</h2>
+          </div>
+          <button class="icon-button" type="button" id="modalClose" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-foot">
+          <button class="secondary-button" type="button" id="modalCancel">取消</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i>
+            保存
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
