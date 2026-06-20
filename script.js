@@ -33,6 +33,8 @@ const MODULE_TYPES = [
   { id: "format", label: "输出格式" },
 ];
 
+const DEFAULT_MODULE_QUICK_TYPES = ["lighting", "camera", "action", "expression", "texture", "negative"];
+
 const GOAL_OPTIONS = [
   "人物登场",
   "情绪爆发",
@@ -62,6 +64,9 @@ const DEFAULT_STATE = {
   theme: "dark",
   activeView: "workbench",
   resultTab: "zh",
+  preferences: {
+    moduleQuickTypeIds: DEFAULT_MODULE_QUICK_TYPES,
+  },
   workbench: {
     promptType: "完整画面提示词",
     roleId: "role-lin",
@@ -546,6 +551,7 @@ function mergeState(base, saved) {
   return {
     ...base,
     ...saved,
+    preferences: { ...base.preferences, ...(saved.preferences || {}) },
     workbench: { ...base.workbench, ...(saved.workbench || {}) },
     roles: mergeById(base.roles, saved.roles),
     modules: mergeById(base.modules, saved.modules),
@@ -1100,24 +1106,69 @@ function renderRoleCard(role) {
 }
 
 function renderModules() {
-  const query = currentQuery();
   const filterType = getTempFilter("moduleType", "all");
-  const modules = state.modules.filter((item) => {
-    const matchQuery = searchable(item).includes(query);
-    const matchType = filterType === "all" || item.type === filterType;
-    return matchQuery && matchType;
-  });
+  const moduleSearch = getTempFilter("moduleSearch", "");
+  const quickTypes = getModuleQuickTypes();
+  const modules = getFilteredModules();
   dom.view.innerHTML = `
     ${renderToolbar("提示词模块库", "保存可反复组合的小积木：光影、镜头、动作、微表情、质感与负面约束。", "新建模块", "module")}
-    <div class="toolbar">
-      <div class="toolbar-filters">
-        <select id="moduleTypeFilter">
-          <option value="all">全部模块类型</option>
-          ${MODULE_TYPES.map((type) => `<option value="${type.id}" ${type.id === filterType ? "selected" : ""}>${type.label}</option>`).join("")}
-        </select>
+    <div class="module-filter-bar">
+      <label class="module-search-field" for="moduleSearchInput">
+        <i data-lucide="search"></i>
+        <input id="moduleSearchInput" type="search" placeholder="搜索模块名称、中文内容、标签" value="${escapeHtml(moduleSearch)}" />
+      </label>
+      <div class="quick-type-strip" aria-label="常用模块类型">
+        <button class="quick-type ${filterType === "all" ? "is-selected" : ""}" type="button" data-module-type-chip="all">全部</button>
+        ${quickTypes.map((type) => `
+          <button class="quick-type ${filterType === type.id ? "is-selected" : ""}" type="button" data-module-type-chip="${type.id}">
+            ${escapeHtml(type.label)}
+          </button>
+        `).join("")}
       </div>
+      <button class="icon-button module-quick-settings" id="moduleQuickSettingsBtn" type="button" aria-label="设置常用模块类型">
+        <i data-lucide="settings"></i>
+      </button>
     </div>
-    ${modules.length ? `<div class="table-wrap">
+    <div id="moduleResults">${renderModuleResults(modules)}</div>
+  `;
+  document.getElementById("moduleSearchInput").addEventListener("input", (event) => {
+    setTempFilter("moduleSearch", event.target.value);
+    window.clearTimeout(renderModules.searchTimer);
+    renderModules.searchTimer = window.setTimeout(() => {
+      renderModules();
+      const input = document.getElementById("moduleSearchInput");
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    }, 120);
+  });
+  document.querySelectorAll("[data-module-type-chip]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setTempFilter("moduleType", button.dataset.moduleTypeChip);
+      renderModules();
+    });
+  });
+  document.getElementById("moduleQuickSettingsBtn").addEventListener("click", openModuleQuickTypeModal);
+  bindAssetEvents();
+}
+
+function getFilteredModules() {
+  const globalQuery = currentQuery();
+  const moduleQuery = getTempFilter("moduleSearch", "").trim().toLowerCase();
+  const filterType = getTempFilter("moduleType", "all");
+  return state.modules.filter((item) => {
+    const haystack = searchable(item);
+    const matchGlobalQuery = !globalQuery || haystack.includes(globalQuery);
+    const matchModuleQuery = !moduleQuery || haystack.includes(moduleQuery);
+    const matchType = filterType === "all" || item.type === filterType;
+    return matchGlobalQuery && matchModuleQuery && matchType;
+  });
+}
+
+function renderModuleResults(modules) {
+  return modules.length
+    ? `<div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -1131,13 +1182,15 @@ function renderModules() {
         </thead>
         <tbody>${modules.map(renderModuleRow).join("")}</tbody>
       </table>
-    </div>` : emptyState("还没有匹配的模块", "把常用光影、动作和微表情拆成模块，后续组合会轻很多。")}
-  `;
-  document.getElementById("moduleTypeFilter").addEventListener("change", (event) => {
-    setTempFilter("moduleType", event.target.value);
-    renderModules();
-  });
-  bindAssetEvents();
+    </div>`
+    : emptyState("还没有匹配的模块", "换一个关键词，或通过右侧齿轮添加更多常用类型。");
+}
+
+function getModuleQuickTypes() {
+  const ids = Array.isArray(state.preferences?.moduleQuickTypeIds)
+    ? state.preferences.moduleQuickTypeIds
+    : DEFAULT_MODULE_QUICK_TYPES;
+  return ids.map((id) => MODULE_TYPES.find((type) => type.id === id)).filter(Boolean);
 }
 
 function renderModuleRow(module) {
@@ -1452,6 +1505,29 @@ function openModuleModal(module = null) {
   openModal();
 }
 
+function openModuleQuickTypeModal() {
+  modalMode = "moduleQuickTypes";
+  modalEditingId = null;
+  dom.modalEyebrow.textContent = "模块库筛选";
+  dom.modalTitle.textContent = "设置常用类型";
+  const selectedIds = new Set(state.preferences?.moduleQuickTypeIds || DEFAULT_MODULE_QUICK_TYPES);
+  dom.modalBody.innerHTML = `
+    <section class="form-section">
+      <h3>常用快捷框</h3>
+      <p class="hint">勾选后会显示在模块库搜索栏旁边，方便直接点击筛选。</p>
+      <div class="checkbox-grid">
+        ${MODULE_TYPES.map((type) => `
+          <label class="checkbox-row">
+            <input type="checkbox" name="quickTypes" value="${type.id}" ${selectedIds.has(type.id) ? "checked" : ""} />
+            <span>${escapeHtml(type.label)}</span>
+          </label>
+        `).join("")}
+      </div>
+    </section>
+  `;
+  openModal();
+}
+
 function openPresetModal(preset = null) {
   modalMode = "preset";
   modalEditingId = preset?.id || null;
@@ -1545,12 +1621,14 @@ function openModelModal(model = null) {
 
 function handleModalSubmit(event) {
   event.preventDefault();
-  const data = Object.fromEntries(new FormData(dom.modalForm).entries());
+  const formData = new FormData(dom.modalForm);
+  const data = Object.fromEntries(formData.entries());
   if (modalMode === "role") saveRole(data);
   if (modalMode === "module") saveModule(data);
   if (modalMode === "preset") savePreset(data);
   if (modalMode === "tag") saveTag(data.tag);
   if (modalMode === "model") saveModel(data);
+  if (modalMode === "moduleQuickTypes") saveModuleQuickTypes(formData);
   closeModal();
   saveState();
   render();
@@ -1579,6 +1657,15 @@ function saveModule(data) {
   };
   upsert(state.modules, module);
   addTags(module.tags);
+}
+
+function saveModuleQuickTypes(formData) {
+  const ids = formData.getAll("quickTypes").filter((id) => MODULE_TYPES.some((type) => type.id === id));
+  state.preferences.moduleQuickTypeIds = ids.length ? ids : DEFAULT_MODULE_QUICK_TYPES;
+  const filterType = getTempFilter("moduleType", "all");
+  if (filterType !== "all" && !state.preferences.moduleQuickTypeIds.includes(filterType)) {
+    setTempFilter("moduleType", "all");
+  }
 }
 
 function savePreset(data) {
