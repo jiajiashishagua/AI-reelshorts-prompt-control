@@ -9,6 +9,11 @@ const NAV_ITEMS = [
   { id: "models", label: "模型配置", icon: "cpu", title: "模型配置" },
 ];
 
+const WORKBENCH_MODES = [
+  { id: "image", label: "图片提示词", icon: "image", title: "图片提示词工作台" },
+  { id: "video", label: "视频提示词", icon: "clapperboard", title: "视频提示词工作台" },
+];
+
 const PROMPT_TYPES = [
   "完整画面提示词",
   "角色提示词",
@@ -60,6 +65,27 @@ const OUTPUT_FORMATS = [
 
 const TARGET_TOOLS = ["RunningHub", "Image2", "Banana Pro", "即梦", "可灵", "Midjourney", "Stable Diffusion", "自定义工具"];
 
+const IMAGE_TASKS = [
+  "完整图片提示词",
+  "角色定妆图",
+  "场景概念图",
+  "光影氛围图",
+  "相机参数复刻",
+  "封面海报图",
+];
+
+const VIDEO_TASKS = [
+  "完整视频画面提示词",
+  "场景光影与相机参数",
+  "人物动作设计",
+  "人物行为逻辑",
+  "微表情设计",
+  "镜头运动",
+  "分镜 / 镜头序列",
+  "角色一致性约束",
+  "负面提示词",
+];
+
 const DEFAULT_STATE = {
   theme: "dark",
   activeView: "workbench",
@@ -68,9 +94,15 @@ const DEFAULT_STATE = {
     moduleQuickTypeIds: DEFAULT_MODULE_QUICK_TYPES,
   },
   workbench: {
+    mode: "video",
+    imageTask: "完整图片提示词",
+    videoTask: "完整视频画面提示词",
     promptType: "完整画面提示词",
     roleId: "role-lin",
     goal: "情绪爆发",
+    sourceBrief: "女主在夜色窗边压住愤怒，准备说出真相。",
+    referenceImageName: "",
+    referenceNote: "如果上传场景图，优先识别空间、主光源、色彩倾向、镜头景别和人物站位。",
     sceneGoal: "女主在夜色窗边压住愤怒，准备说出真相。",
     frameDescription: "近景，人物站在窗边，窗外是雨夜城市光，室内光线克制。",
     extra: "保持人物真实自然，不要夸张表演，镜头要有高级短剧电影感。",
@@ -580,21 +612,67 @@ function getHashView() {
   return NAV_ITEMS.some((item) => item.id === view) ? view : "workbench";
 }
 
+function getWorkbenchMode() {
+  return WORKBENCH_MODES.find((mode) => mode.id === state.workbench.mode) || WORKBENCH_MODES[1];
+}
+
+function getWorkbenchTask() {
+  return state.workbench.mode === "image" ? state.workbench.imageTask : state.workbench.videoTask;
+}
+
+function syncPromptTypeWithMode() {
+  const wb = state.workbench;
+  if (wb.mode === "image") {
+    wb.promptType = wb.imageTask || IMAGE_TASKS[0];
+    wb.outputFormat = wb.outputFormat === "视频画面提示词" || wb.outputFormat === "分镜提示词" ? "中文提示词" : wb.outputFormat;
+    wb.targetTool = ["可灵", "RunningHub"].includes(wb.targetTool) ? "Image2" : wb.targetTool;
+  } else {
+    wb.promptType = wb.videoTask || VIDEO_TASKS[0];
+    wb.outputFormat = wb.outputFormat === "单张图提示词" ? "视频画面提示词" : wb.outputFormat;
+    wb.targetTool = ["Midjourney", "Stable Diffusion"].includes(wb.targetTool) ? "可灵" : wb.targetTool;
+  }
+  regenerateResults();
+}
+
 function renderNav() {
-  dom.nav.innerHTML = NAV_ITEMS.map(
-    (item) => `
-      <a class="nav-item ${item.id === state.activeView ? "is-active" : ""}" href="#${item.id}">
-        <i data-lucide="${item.icon}"></i>
-        <span>${item.label}</span>
-      </a>
-    `
-  ).join("");
+  dom.nav.innerHTML = NAV_ITEMS.map((item) => {
+    const isActive = item.id === state.activeView;
+    const subnav = item.id === "workbench"
+      ? `<div class="nav-sublist">
+          ${WORKBENCH_MODES.map((mode) => `
+            <button class="nav-subitem ${state.workbench.mode === mode.id ? "is-active" : ""}" type="button" data-workbench-mode-nav="${mode.id}">
+              <i data-lucide="${mode.icon}"></i>
+              <span>${mode.label}</span>
+            </button>
+          `).join("")}
+        </div>`
+      : "";
+    return `
+      <div class="nav-group">
+        <a class="nav-item ${isActive ? "is-active" : ""}" href="#${item.id}">
+          <i data-lucide="${item.icon}"></i>
+          <span>${item.label}</span>
+        </a>
+        ${subnav}
+      </div>
+    `;
+  }).join("");
+  dom.nav.querySelectorAll("[data-workbench-mode-nav]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.workbench.mode = button.dataset.workbenchModeNav;
+      syncPromptTypeWithMode();
+      saveState();
+      location.hash = "#workbench";
+      render();
+    });
+  });
   refreshIcons();
 }
 
 function render() {
   const item = NAV_ITEMS.find((entry) => entry.id === state.activeView) || NAV_ITEMS[0];
-  dom.pageTitle.textContent = item.title;
+  const mode = getWorkbenchMode();
+  dom.pageTitle.textContent = state.activeView === "workbench" ? mode.title : item.title;
   renderNav();
 
   if (state.activeView === "workbench") renderWorkbench();
@@ -612,6 +690,8 @@ function renderWorkbench() {
   const wb = state.workbench;
   const role = getRole(wb.roleId);
   const stats = getStats();
+  const mode = getWorkbenchMode();
+  const task = getWorkbenchTask();
 
   dom.view.innerHTML = `
     <div class="dashboard-grid">
@@ -622,26 +702,49 @@ function renderWorkbench() {
         ${statCard("标签数量", stats.tags)}
       </div>
 
-      <div class="workbench-layout">
-        <section class="panel">
+      <section class="panel workbench-mode-hero">
+        <div class="mode-switcher" aria-label="工作台模式">
+          ${WORKBENCH_MODES.map((item) => `
+            <button class="mode-card ${wb.mode === item.id ? "is-active" : ""}" type="button" data-workbench-mode="${item.id}">
+              <i data-lucide="${item.icon}"></i>
+              <span>${item.label}</span>
+              <small>${item.id === "image" ? "静帧、定妆、场景、光影资产" : "镜头、动作、行为、分镜与一致性"}</small>
+            </button>
+          `).join("")}
+        </div>
+        <div class="mode-brief">
+          <p class="eyebrow">${escapeHtml(mode.label)}</p>
+          <h2>${escapeHtml(task)}</h2>
+          <p>${wb.mode === "image" ? "面向静帧级画面控制，重点处理构图、角色外观、场景光影、相机参数和画面质感。" : "面向连续镜头控制，重点处理场景光影、镜头运动、人物行为、动作节奏、微表情和角色一致性。"}</p>
+        </div>
+      </section>
+
+      <div class="pro-workbench-layout">
+        <section class="panel control-column">
           <div class="panel-head">
             <div>
-              <h2>引导式选择</h2>
-              <p>先选类型、角色和关键控制项。</p>
+              <h2>专业控制项</h2>
+              <p>选择模式、子任务、角色资产和可锁定模块。</p>
             </div>
           </div>
           <div class="panel-body">
-            ${renderStepper()}
-            <div class="field">
-              <label for="wbPromptType">创建类型</label>
-              <select id="wbPromptType">${optionList(PROMPT_TYPES, wb.promptType)}</select>
-            </div>
+            ${renderTaskStrip()}
             <div class="field">
               <label for="wbRole">角色资产</label>
               <select id="wbRole">
                 <option value="">不使用角色</option>
                 ${state.roles.map((item) => `<option value="${item.id}" ${item.id === wb.roleId ? "selected" : ""}>${escapeHtml(item.name)} / ${escapeHtml(item.identity)}</option>`).join("")}
               </select>
+            </div>
+            <div class="field-grid two-col">
+              <div class="field">
+                <label for="wbOutputFormat">输出格式</label>
+                <select id="wbOutputFormat">${optionList(OUTPUT_FORMATS, wb.outputFormat)}</select>
+              </div>
+              <div class="field">
+                <label for="wbTargetTool">目标工具</label>
+                <select id="wbTargetTool">${optionList(TARGET_TOOLS, wb.targetTool)}</select>
+              </div>
             </div>
             <div class="field">
               <span class="label">画面目标</span>
@@ -655,11 +758,11 @@ function renderWorkbench() {
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel intelligence-column">
           <div class="panel-head">
             <div>
-              <h2>当前画面编辑</h2>
-              <p>半固定资产可以在这里临时调整。</p>
+              <h2>输入与AI拆解</h2>
+              <p>输入一句话，或一句话加参考图，再由系统拆成可控创作方案。</p>
             </div>
             <button class="secondary-button compact" type="button" id="resetWorkbenchBtn">
               <i data-lucide="rotate-ccw"></i>
@@ -667,16 +770,31 @@ function renderWorkbench() {
             </button>
           </div>
           <div class="panel-body">
-            <div class="field-grid two-col">
+            <div class="prompt-intake">
               <div class="field">
-                <label for="wbOutputFormat">输出格式</label>
-                <select id="wbOutputFormat">${optionList(OUTPUT_FORMATS, wb.outputFormat)}</select>
+                <label for="wbSourceBrief">一句话需求 / 剧情 / 镜头意图</label>
+                <textarea id="wbSourceBrief" class="brief-input" placeholder="例如：女主在夜色窗边压住愤怒，准备说出真相。">${escapeHtml(wb.sourceBrief || "")}</textarea>
+              </div>
+              <div class="reference-card">
+                <div>
+                  <p class="eyebrow">参考图</p>
+                  <strong>${wb.referenceImageName ? escapeHtml(wb.referenceImageName) : "可选上传"}</strong>
+                  <span>${wb.mode === "image" ? "用于识别画面、构图、光影和风格。" : "用于识别场景空间、人物站位、光线来源和镜头条件。"}</span>
+                </div>
+                <label class="secondary-button compact" for="wbReferenceImage">
+                  <i data-lucide="image-plus"></i>
+                  选择图片
+                </label>
+                <input id="wbReferenceImage" type="file" accept="image/*" hidden />
               </div>
               <div class="field">
-                <label for="wbTargetTool">目标工具</label>
-                <select id="wbTargetTool">${optionList(TARGET_TOOLS, wb.targetTool)}</select>
+                <label for="wbReferenceNote">参考图识别重点</label>
+                <textarea id="wbReferenceNote">${escapeHtml(wb.referenceNote || "")}</textarea>
               </div>
             </div>
+
+            ${renderInsightPackage(role)}
+
             <div class="field">
               <label for="wbSceneGoal">当前创作目标</label>
               <textarea id="wbSceneGoal">${escapeHtml(wb.sceneGoal)}</textarea>
@@ -691,7 +809,7 @@ function renderWorkbench() {
             </div>
             ${role ? renderRoleSnapshot(role) : ""}
             <div>
-              <p class="eyebrow">已选模块预览</p>
+              <p class="eyebrow">可锁定模块预览</p>
               <div class="selected-modules">
                 ${MODULE_TYPES.map((type) => renderModuleEditor(type)).join("")}
               </div>
@@ -703,7 +821,7 @@ function renderWorkbench() {
           <div class="panel-head">
             <div>
               <h2>生成结果</h2>
-              <p>结果可编辑、复制、保存为预设或新版本。</p>
+              <p>由专业拆解、角色资产和锁定模块组合，可继续编辑、复制和保存。</p>
             </div>
           </div>
           <div class="result-box">
@@ -745,6 +863,128 @@ function renderWorkbench() {
   `;
 
   bindWorkbenchEvents();
+}
+
+function renderTaskStrip() {
+  const wb = state.workbench;
+  const tasks = wb.mode === "image" ? IMAGE_TASKS : VIDEO_TASKS;
+  const activeTask = getWorkbenchTask();
+  return `
+    <div class="field">
+      <span class="label">${wb.mode === "image" ? "图片子任务" : "视频子任务"}</span>
+      <div class="task-strip">
+        ${tasks.map((task) => `
+          <button class="task-chip ${task === activeTask ? "is-selected" : ""}" type="button" data-workbench-task="${escapeHtml(task)}">
+            ${escapeHtml(task)}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderInsightPackage(role) {
+  const wb = state.workbench;
+  const brief = wb.sourceBrief || wb.sceneGoal || "请先输入剧情、画面目标或镜头意图。";
+  const task = getWorkbenchTask();
+  const roleName = role?.name || "当前角色";
+  const isVideo = wb.mode === "video";
+  const cards = isVideo
+    ? [
+        {
+          title: "AI剧情判断",
+          tone: "判断",
+          body: `当前输入的核心不是单纯执行「${brief}」，而是判断这一镜头最需要控制的情绪临界点、人物关系和画面节奏。${role ? `${roleName} 的固定气质是「${role.temperament}」，因此方案应优先保留角色克制感和一致性。` : "如果选择角色资产，系统会把角色固定项、可变项和禁止项一起纳入判断。"}`,
+        },
+        {
+          title: "可拆解模块",
+          tone: "拆解",
+          body: "视频提示词会拆成场景空间、光影与相机参数、人物行为逻辑、动作节奏、微表情、镜头运动、画面质感和负面约束。每个模块后续都应该给出多个可选方案，并允许用户锁定或改写。",
+        },
+        {
+          title: "当前子任务重点",
+          tone: "任务",
+          body: getVideoTaskGuidance(task),
+        },
+        {
+          title: "组合策略",
+          tone: "输出",
+          body: "最终结果不应只是拼接词条，而要把 AI 判断、参考图识别、角色资产和模块选择合成可直接投喂视频模型的完整提示词，并保留中文、英文、负面提示词和结构化 JSON。",
+        },
+      ]
+    : [
+        {
+          title: "AI画面判断",
+          tone: "判断",
+          body: `当前输入会被理解为一张高质量静帧需求：先确定主体、构图、场景、光影、镜头焦段、画面质感和目标工具，再判断哪些元素必须固定，哪些可以变化。${role ? `${roleName} 的外观固定项会作为角色一致性锚点。` : ""}`,
+        },
+        {
+          title: "可拆解模块",
+          tone: "拆解",
+          body: "图片提示词会拆成主体与角色、场景空间、构图景别、光影色调、相机参数、画面质感、风格参考和负面约束。后续可对每个模块给出多个专业方案。",
+        },
+        {
+          title: "当前子任务重点",
+          tone: "任务",
+          body: getImageTaskGuidance(task),
+        },
+        {
+          title: "组合策略",
+          tone: "输出",
+          body: "最终结果应同时适合直接生成和继续精修：既有完整提示词，也保留可锁定的模块化结构，便于复用到角色定妆、场景概念和光影资产库。",
+        },
+      ];
+
+  return `
+    <section class="ai-insight-package">
+      <div class="insight-head">
+        <div>
+          <p class="eyebrow">AI专业拆解方案包</p>
+          <h3>${escapeHtml(task)}</h3>
+        </div>
+        <button class="secondary-button compact" type="button" id="applyInsightBtn">
+          <i data-lucide="sparkles"></i>
+          写入编辑区
+        </button>
+      </div>
+      <div class="insight-grid">
+        ${cards.map((card) => `
+          <article class="insight-card">
+            <span>${escapeHtml(card.tone)}</span>
+            <h4>${escapeHtml(card.title)}</h4>
+            <p>${escapeHtml(card.body)}</p>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function getVideoTaskGuidance(task) {
+  const guidance = {
+    "完整视频画面提示词": "需要同时输出场景、人物、动作、微表情、镜头、光影、质感、节奏和负面约束，适合直接投喂视频生成工具。",
+    "场景光影与相机参数": "重点识别主光源、光线方向、色温、白平衡、曝光、对比度、阴影形态、镜头焦段、光圈、帧率和记录格式。",
+    "人物动作设计": "重点把动作拆成起势、停顿、变化、收束，控制动作幅度、速度、身体重心和手部细节。",
+    "人物行为逻辑": "重点判断人物为什么这么做、先做什么、后做什么、动作背后的心理动机和关系变化。",
+    "微表情设计": "重点控制眼神、眉、嘴唇、呼吸、下颌、眼尾湿润度和表情强度，避免夸张表演。",
+    "镜头运动": "重点给出镜头景别、运动方式、推拉摇移、速度、稳定性、焦点变化和情绪节奏。",
+    "分镜 / 镜头序列": "重点拆成多个镜头，每个镜头给景别、动作、表情、光影、时长和转场逻辑。",
+    "角色一致性约束": "重点锁定角色脸型、发型、服装主色、气质、表情范围和禁止变化项。",
+    "负面提示词": "重点输出防跑偏约束，包括角色、风格、画质、动作、表情、镜头和模型常见错误。",
+  };
+  return guidance[task] || guidance["完整视频画面提示词"];
+}
+
+function getImageTaskGuidance(task) {
+  const guidance = {
+    "完整图片提示词": "需要完整覆盖主体、场景、构图、光影、色彩、相机参数、画面质感、风格和负面约束。",
+    "角色定妆图": "重点锁定脸型、五官、发型、发色、肤色、服装、妆容、配饰和角色气质。",
+    "场景概念图": "重点输出空间结构、时代背景、材质、道具、环境光、色彩基底和氛围关键词。",
+    "光影氛围图": "重点提取主光源、光线方向、硬软程度、阴影形态、色温、白平衡、曝光和叙事氛围。",
+    "相机参数复刻": "重点输出机身、镜头、焦段、光圈、ISO/EI、快门、Log、记录格式、景深和构图。",
+    "封面海报图": "重点考虑主体识别度、视觉焦点、留白、标题空间、情绪冲击和商业短剧质感。",
+  };
+  return guidance[task] || guidance["完整图片提示词"];
 }
 
 function statCard(label, value) {
@@ -830,10 +1070,28 @@ function renderRoleSnapshot(role) {
 function bindWorkbenchEvents() {
   const wb = state.workbench;
 
-  document.getElementById("wbPromptType").addEventListener("change", (event) => {
-    wb.promptType = event.target.value;
-    regenerateResults();
+  document.querySelectorAll("[data-workbench-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      wb.mode = button.dataset.workbenchMode;
+      syncPromptTypeWithMode();
+      render();
+    });
   });
+
+  document.querySelectorAll("[data-workbench-task]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (wb.mode === "image") {
+        wb.imageTask = button.dataset.workbenchTask;
+      } else {
+        wb.videoTask = button.dataset.workbenchTask;
+      }
+      wb.promptType = getWorkbenchTask();
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
+
   document.getElementById("wbRole").addEventListener("change", (event) => {
     wb.roleId = event.target.value;
     regenerateResults();
@@ -846,6 +1104,21 @@ function bindWorkbenchEvents() {
   });
   document.getElementById("wbTargetTool").addEventListener("change", (event) => {
     wb.targetTool = event.target.value;
+    regenerateResults();
+  });
+  document.getElementById("wbSourceBrief").addEventListener("input", (event) => {
+    wb.sourceBrief = event.target.value;
+    regenerateResults();
+  });
+  document.getElementById("wbReferenceImage").addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    wb.referenceImageName = file ? file.name : "";
+    saveState();
+    renderWorkbench();
+    refreshIcons();
+  });
+  document.getElementById("wbReferenceNote").addEventListener("input", (event) => {
+    wb.referenceNote = event.target.value;
     regenerateResults();
   });
   document.getElementById("wbSceneGoal").addEventListener("input", (event) => {
@@ -910,6 +1183,12 @@ function bindWorkbenchEvents() {
   });
   document.getElementById("savePresetBtn").addEventListener("click", saveCurrentPreset);
   document.getElementById("saveVersionBtn").addEventListener("click", saveCurrentVersion);
+  document.getElementById("applyInsightBtn").addEventListener("click", () => {
+    applyInsightToEditor();
+    regenerateResults();
+    renderWorkbench();
+    showToast("AI拆解方案已写入编辑区");
+  });
   document.getElementById("resetWorkbenchBtn").addEventListener("click", () => {
     state.workbench = clone(DEFAULT_STATE.workbench);
     regenerateResults();
@@ -917,6 +1196,21 @@ function bindWorkbenchEvents() {
     renderWorkbench();
     showToast("工作台已恢复为示例配置");
   });
+}
+
+function applyInsightToEditor() {
+  const wb = state.workbench;
+  const task = getWorkbenchTask();
+  const role = getRole(wb.roleId);
+  const brief = wb.sourceBrief || wb.sceneGoal || "当前画面需求";
+  wb.sceneGoal = `${task}：${brief}`;
+  wb.frameDescription = wb.mode === "video"
+    ? `请基于输入内容拆解视频画面：先判断场景空间和人物站位，再输出光影与相机参数、人物行为逻辑、动作节奏、微表情、镜头运动和负面约束。${role ? `角色资产优先保持 ${role.name} 的固定项与禁止项。` : ""}`
+    : `请基于输入内容拆解图片画面：先判断主体、场景、构图和视觉焦点，再输出光影色调、相机参数、画面质感、风格参考和负面约束。${role ? `角色资产优先保持 ${role.name} 的外观一致性。` : ""}`;
+  wb.extra = [
+    wb.referenceImageName ? `参考图：${wb.referenceImageName}` : "暂无参考图；如上传图片，需要识别空间、光源、色彩、镜头和人物站位。",
+    wb.referenceNote || "输出必须体现专业判断，不要只给简单标签；每个模块后续都应支持多方案选择、锁定和修改。",
+  ].join("\n");
 }
 
 function ensureWorkbenchResults() {
@@ -935,6 +1229,9 @@ function regenerateResults() {
 function composePrompt() {
   const wb = state.workbench;
   const role = getRole(wb.roleId);
+  const mode = getWorkbenchMode();
+  const task = getWorkbenchTask();
+  const guidance = wb.mode === "video" ? getVideoTaskGuidance(task) : getImageTaskGuidance(task);
   const selectedModules = MODULE_TYPES.map((type) => {
     const module = getModule(wb.selectedModuleIds[type.id]);
     if (!module) return null;
@@ -994,10 +1291,21 @@ function composePrompt() {
     : "No fixed character asset.";
 
   const zh = [
-    `【提示词类型】${wb.promptType}`,
+    `【工作台模式】${mode.label}`,
+    `【专业子任务】${task}`,
     `【目标工具】${wb.targetTool}`,
     `【输出格式】${wb.outputFormat}`,
     `【画面目标】${wb.goal || "未选择"}`,
+    "",
+    "【原始输入】",
+    wb.sourceBrief || "请补充一句话需求、剧情或镜头意图。",
+    "",
+    "【参考图信息】",
+    wb.referenceImageName ? `已选择参考图：${wb.referenceImageName}` : "未选择参考图。",
+    wb.referenceNote || "无参考图识别要求。",
+    "",
+    "【AI专业判断】",
+    guidance,
     "",
     "【角色资产】",
     roleZh,
@@ -1019,10 +1327,21 @@ function composePrompt() {
   ].join("\n");
 
   const en = [
-    `[Prompt Type] ${wb.promptType}`,
+    `[Workbench Mode] ${mode.label}`,
+    `[Professional Task] ${task}`,
     `[Target Tool] ${wb.targetTool}`,
     `[Output Format] ${wb.outputFormat}`,
     `[Scene Goal] ${wb.goal || "Not selected"}`,
+    "",
+    "[Original Input]",
+    wb.sourceBrief || "Please add a brief, story beat, or shot intention.",
+    "",
+    "[Reference Image]",
+    wb.referenceImageName ? `Reference image selected: ${wb.referenceImageName}` : "No reference image selected.",
+    wb.referenceNote || "No reference-image analysis note.",
+    "",
+    "[AI Professional Judgment]",
+    guidance,
     "",
     "[Character Asset]",
     roleEn,
@@ -1045,10 +1364,17 @@ function composePrompt() {
 
   const json = JSON.stringify(
     {
+      mode: wb.mode,
+      modeLabel: mode.label,
+      task,
       promptType: wb.promptType,
       targetTool: wb.targetTool,
       outputFormat: wb.outputFormat,
       goal: wb.goal,
+      sourceBrief: wb.sourceBrief,
+      referenceImageName: wb.referenceImageName,
+      referenceNote: wb.referenceNote,
+      professionalGuidance: guidance,
       role: role ? { id: role.id, name: role.name, fixed: lines(role.fixed), variable: lines(role.variable), forbidden: lines(role.forbidden) } : null,
       sceneGoal: wb.sceneGoal,
       frameDescription: wb.frameDescription,
