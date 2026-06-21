@@ -86,6 +86,113 @@ const VIDEO_TASKS = [
   "负面提示词",
 ];
 
+const QUICK_START_TASKS = [
+  {
+    type: "角色提示词",
+    label: "角色一致性提示词",
+    description: "固定发型、脸型、服装、气质，减少角色跑偏。",
+  },
+  {
+    type: "完整画面提示词",
+    label: "单镜头画面提示词",
+    description: "适合生成首帧图、单张画面或单个视频镜头。",
+  },
+  {
+    type: "动作提示词",
+    label: "动作与站位提示词",
+    description: "控制人物在哪里、怎么动、和谁互动。",
+  },
+  {
+    type: "微表情提示词",
+    label: "微表情提示词",
+    description: "控制眼神、嘴角、呼吸、停顿等情绪细节。",
+  },
+  {
+    type: "光影提示词",
+    label: "光影氛围提示词",
+    description: "控制电影感、逆光、窗边光、冷暖色调。",
+  },
+  {
+    type: "视频分镜提示词",
+    label: "完整分镜提示词",
+    description: "把一段剧情拆成多个可生成镜头。",
+  },
+];
+
+const PROMPT_TYPE_BUTTONS = [
+  { label: "完整画面", value: "完整画面提示词" },
+  { label: "角色", value: "角色提示词" },
+  { label: "镜头", value: "镜头提示词" },
+  { label: "动作", value: "动作提示词" },
+  { label: "微表情", value: "微表情提示词" },
+  { label: "光影", value: "光影提示词" },
+  { label: "负面", value: "负面提示词" },
+  { label: "分镜", value: "视频分镜提示词" },
+];
+
+const QUICK_SCENES = [
+  "人物登场",
+  "情绪爆发",
+  "对话冲突",
+  "回忆闪回",
+  "转身离开",
+  "沉默对视",
+  "战斗前夕",
+  "亲密互动",
+  "发现真相",
+  "强忍情绪",
+];
+
+const CHARACTER_STATES = ["平静", "克制", "愤怒", "委屈", "震惊", "心虚", "崩溃", "冷漠", "犹豫", "压抑"];
+const RELATION_TENSIONS = ["对峙", "疏离", "试探", "压迫", "误会", "暧昧", "冲突", "背叛", "和解前夕"];
+const SHOT_SIZES = ["特写", "近景", "中景", "远景", "过肩拍", "背影", "全景"];
+const CAMERA_ANGLES = ["平视", "低角度", "高角度", "侧脸", "斜侧方", "主观视角", "俯拍", "仰拍"];
+const COMPOSITIONS = ["居中构图", "三分法", "留白压迫", "前景遮挡", "门框构图", "镜中反射", "人物偏左", "人物偏右"];
+const BLOCKING_OPTIONS = ["单人居中", "双人对峙", "一前一后", "背对背", "女主在前，男主在后", "角色在画面边缘", "角色被环境压迫"];
+const ACTION_OPTIONS = ["抬眼", "后退半步", "攥紧手指", "转身离开", "停顿三秒", "慢慢靠近", "轻微低头", "欲言又止", "伸手又收回"];
+const EYE_OPTIONS = ["躲闪", "冷淡", "湿润", "失焦", "压迫", "震惊", "疲惫", "隐忍"];
+const MOUTH_OPTIONS = ["嘴唇紧抿", "微微颤抖", "冷笑", "欲言又止", "下意识抿唇"];
+const BREATH_OPTIONS = ["屏住呼吸", "呼吸急促", "轻轻叹气", "压抑喘息", "呼吸变慢"];
+const LIGHTING_OPTIONS = ["冷光", "暖光", "逆光", "窗边光", "月光", "烛光", "顶光", "侧逆光", "柔和散射光", "高对比阴影"];
+const ATMOSPHERE_OPTIONS = ["压抑", "高级", "悬疑", "浪漫", "孤独", "危险", "梦幻", "冷峻", "破碎感"];
+const TEXTURE_OPTIONS = ["电影感", "超写实", "浅景深", "高对比", "柔焦", "颗粒感", "电视剧质感", "高级广告感"];
+
+const PARAMETER_GROUPS = [
+  { key: "aspectRatio", label: "画幅比例", options: ["1:1", "16:9", "9:16", "4:5", "3:4", "21:9"] },
+  { key: "quality", label: "画面质量", options: ["标准", "高质量", "超写实"] },
+  { key: "styleStrength", label: "风格强度", options: ["弱", "中", "强"] },
+  { key: "motionLevel", label: "运动幅度", options: ["静态", "轻微", "中等", "明显"] },
+  { key: "cameraSpeed", label: "镜头速度", options: ["慢", "中", "快"] },
+  { key: "emotionIntensity", label: "情绪强度", options: ["克制", "中等", "强烈"] },
+];
+
+const NEGATIVE_OPTIONS = [
+  "不要变脸",
+  "不要改变发型",
+  "不要夸张表情",
+  "不要卡通化",
+  "不要多余手指",
+  "不要肢体扭曲",
+  "不要过度磨皮",
+  "不要文字水印",
+  "不要画面崩坏",
+  "不要低清晰度",
+];
+
+const OPTIMIZE_ACTIONS = [
+  { id: "cinematic", label: "更电影感", zh: "强化电影级布光、浅景深、真实胶片颗粒与高级短剧剧照质感。", en: "cinematic lighting, shallow depth of field, realistic film still, subtle film grain" },
+  { id: "realistic", label: "更真实", zh: "降低网感和过度修饰，保留真实皮肤纹理、自然动作和物理细节。", en: "more realistic skin texture, natural motion, physical detail, no synthetic look" },
+  { id: "micro", label: "增强微表情", zh: "加强眼神、嘴角、呼吸、下颌和停顿的细腻变化，避免夸张表演。", en: "enhanced micro-expression, subtle eyes, lips, breath, jaw tension, restrained acting" },
+  { id: "restrain", label: "降低夸张程度", zh: "降低表演幅度，保持情绪克制、动作自然、表情不过火。", en: "restrained performance, natural movement, subtle emotional intensity" },
+  { id: "lighting", label: "增强光影层次", zh: "强化主光方向、色温、阴影形态、暗部细节和冷暖关系。", en: "layered lighting, motivated key light, color temperature contrast, detailed shadows" },
+  { id: "consistency", label: "增强角色一致性", zh: "锁定角色固定项、脸型、发型、服装主色、气质和禁止变化项。", en: "strong character consistency, fixed facial structure, hair, outfit palette, temperament" },
+  { id: "english", label: "改成英文", zh: "输出优先使用英文提示词结构，保留中文备注作为参考。", en: "convert to a concise English generation prompt" },
+  { id: "bilingual", label: "改成中英双语", zh: "输出中文和英文两套提示词，便于不同模型调用。", en: "provide bilingual Chinese and English prompts" },
+  { id: "kling", label: "适配可灵", zh: "强调视频运动连续性、人物动作自然度、镜头节奏和角色一致性。", en: "optimized for Kling-style video generation, coherent motion and stable character identity" },
+  { id: "jimeng", label: "适配即梦", zh: "强调中文语义清晰、镜头拆解明确、画面目标和负面约束完整。", en: "clear Chinese semantic structure, shot breakdown, full negative constraints" },
+  { id: "midjourney", label: "适配 Midjourney", zh: "强化图像关键词、构图、光影、风格参数和画幅表达。", en: "Midjourney-ready visual keywords, composition, lighting, style and aspect ratio" },
+];
+
 const DEFAULT_STATE = {
   theme: "dark",
   activeView: "workbench",
@@ -108,6 +215,31 @@ const DEFAULT_STATE = {
     extra: "保持人物真实自然，不要夸张表演，镜头要有高级短剧电影感。",
     outputFormat: "中英双语",
     targetTool: "可灵",
+    quickTask: "单镜头画面提示词",
+    characterState: "克制",
+    relationTension: "对峙",
+    shotSize: "近景",
+    cameraAngle: "平视",
+    composition: "留白压迫",
+    blocking: "角色在画面边缘",
+    action: "攥紧手指",
+    actionDetail: "她的手指轻轻攥紧衣角，但脸上仍然保持克制。",
+    eye: "隐忍",
+    mouth: "嘴唇紧抿",
+    breath: "屏住呼吸",
+    expressionDetail: "眼尾微红，但不要哭出来。",
+    lightingControl: "窗边光",
+    atmosphere: "压抑",
+    texture: "电影感",
+    aspectRatio: "9:16",
+    quality: "高质量",
+    styleStrength: "中",
+    motionLevel: "轻微",
+    cameraSpeed: "慢",
+    emotionIntensity: "克制",
+    negativeOptions: NEGATIVE_OPTIONS.slice(),
+    customNegative: "",
+    optimizationNotes: [],
     selectedModuleIds: {
       scene: "module-scene-window",
       camera: "module-camera-close",
@@ -580,11 +712,20 @@ function loadState() {
 }
 
 function mergeState(base, saved) {
+  const savedWorkbench = saved.workbench || {};
   return {
     ...base,
     ...saved,
     preferences: { ...base.preferences, ...(saved.preferences || {}) },
-    workbench: { ...base.workbench, ...(saved.workbench || {}) },
+    workbench: {
+      ...base.workbench,
+      ...savedWorkbench,
+      selectedModuleIds: { ...base.workbench.selectedModuleIds, ...(savedWorkbench.selectedModuleIds || {}) },
+      moduleOverrides: { ...base.workbench.moduleOverrides, ...(savedWorkbench.moduleOverrides || {}) },
+      results: { ...base.workbench.results, ...(savedWorkbench.results || {}) },
+      negativeOptions: Array.isArray(savedWorkbench.negativeOptions) ? savedWorkbench.negativeOptions : base.workbench.negativeOptions,
+      optimizationNotes: Array.isArray(savedWorkbench.optimizationNotes) ? savedWorkbench.optimizationNotes : base.workbench.optimizationNotes,
+    },
     roles: mergeById(base.roles, saved.roles),
     modules: mergeById(base.modules, saved.modules),
     presets: mergeById(base.presets, saved.presets),
@@ -689,80 +830,66 @@ function renderWorkbench() {
   ensureWorkbenchResults();
   const wb = state.workbench;
   const role = getRole(wb.roleId);
-  const stats = getStats();
-  const mode = getWorkbenchMode();
-  const task = getWorkbenchTask();
 
   dom.view.innerHTML = `
-    <div class="dashboard-grid">
-      <div class="stat-grid">
-        ${statCard("角色资产", stats.roles)}
-        ${statCard("提示词模块", stats.modules)}
-        ${statCard("完整预设", stats.presets)}
-        ${statCard("标签数量", stats.tags)}
-      </div>
+    <div class="task-workbench">
+      ${renderPromptResultHero()}
+      ${renderQuickStart()}
 
-      <section class="panel workbench-mode-hero">
-        <div class="mode-switcher" aria-label="工作台模式">
-          ${WORKBENCH_MODES.map((item) => `
-            <button class="mode-card ${wb.mode === item.id ? "is-active" : ""}" type="button" data-workbench-mode="${item.id}">
-              <i data-lucide="${item.icon}"></i>
-              <span>${item.label}</span>
-              <small>${item.id === "image" ? "静帧、定妆、场景、光影资产" : "镜头、动作、行为、分镜与一致性"}</small>
-            </button>
-          `).join("")}
-        </div>
-        <div class="mode-brief">
-          <p class="eyebrow">${escapeHtml(mode.label)}</p>
-          <h2>${escapeHtml(task)}</h2>
-          <p>${wb.mode === "image" ? "面向静帧级画面控制，重点处理构图、角色外观、场景光影、相机参数和画面质感。" : "面向连续镜头控制，重点处理场景光影、镜头运动、人物行为、动作节奏、微表情和角色一致性。"}</p>
-        </div>
-      </section>
-
-      <div class="pro-workbench-layout">
-        <section class="panel control-column">
+      <div class="prompt-builder-grid">
+        <section class="panel builder-column">
           <div class="panel-head">
             <div>
-              <h2>专业控制项</h2>
-              <p>选择模式、子任务、角色资产和可锁定模块。</p>
+              <h2>选择任务</h2>
+              <p>先确定生成类型、角色资产、场景入口和目标工具。</p>
             </div>
           </div>
           <div class="panel-body">
-            ${renderTaskStrip()}
-            <div class="field">
-              <label for="wbRole">角色资产</label>
-              <select id="wbRole">
-                <option value="">不使用角色</option>
-                ${state.roles.map((item) => `<option value="${item.id}" ${item.id === wb.roleId ? "selected" : ""}>${escapeHtml(item.name)} / ${escapeHtml(item.identity)}</option>`).join("")}
-              </select>
-            </div>
-            <div class="field-grid two-col">
-              <div class="field">
-                <label for="wbOutputFormat">输出格式</label>
-                <select id="wbOutputFormat">${optionList(OUTPUT_FORMATS, wb.outputFormat)}</select>
-              </div>
-              <div class="field">
-                <label for="wbTargetTool">目标工具</label>
-                <select id="wbTargetTool">${optionList(TARGET_TOOLS, wb.targetTool)}</select>
-              </div>
+            <div class="mode-tabs" aria-label="图片与视频提示词模式">
+              ${WORKBENCH_MODES.map((item) => `
+                <button class="mode-tab ${wb.mode === item.id ? "is-active" : ""}" type="button" data-workbench-mode="${item.id}">
+                  <i data-lucide="${item.icon}"></i>
+                  ${escapeHtml(item.label)}
+                </button>
+              `).join("")}
             </div>
             <div class="field">
-              <span class="label">画面目标</span>
+              <span class="label">提示词类型</span>
+              <div class="prompt-type-grid">
+                ${PROMPT_TYPE_BUTTONS.map((item) => `
+                  <button class="type-button ${wb.promptType === item.value ? "is-selected" : ""}" type="button" data-prompt-type="${escapeHtml(item.value)}">
+                    ${escapeHtml(item.label)}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+            ${renderWorkbenchRoleCard(role)}
+            <div class="field">
+              <span class="label">快捷场景</span>
               <div class="chip-row">
-                ${GOAL_OPTIONS.map((goal) => `<button class="chip ${goal === wb.goal ? "is-selected" : ""}" type="button" data-goal="${escapeHtml(goal)}">${escapeHtml(goal)}</button>`).join("")}
+                ${QUICK_SCENES.map((scene) => `
+                  <button class="chip ${wb.goal === scene ? "is-selected" : ""}" type="button" data-quick-scene="${escapeHtml(scene)}">
+                    ${escapeHtml(scene)}
+                  </button>
+                `).join("")}
               </div>
             </div>
-            <div class="module-picker">
-              ${MODULE_TYPES.map((type) => renderModuleSelect(type)).join("")}
+            <div class="field">
+              <label for="wbTargetTool">输出给哪个工具？</label>
+              <select id="wbTargetTool">${optionList(unique(["通用", ...TARGET_TOOLS, "自定义"]), wb.targetTool)}</select>
+            </div>
+            <div class="field">
+              <label for="wbOutputFormat">输出格式</label>
+              <select id="wbOutputFormat">${optionList(OUTPUT_FORMATS, wb.outputFormat)}</select>
             </div>
           </div>
         </section>
 
-        <section class="panel intelligence-column">
+        <section class="panel builder-column main-builder-column">
           <div class="panel-head">
             <div>
-              <h2>输入与AI拆解</h2>
-              <p>输入一句话，或一句话加参考图，再由系统拆成可控创作方案。</p>
+              <h2>画面与镜头控制</h2>
+              <p>填写这一镜头的表达目标，再调整镜头、动作、微表情和光影。</p>
             </div>
             <button class="secondary-button compact" type="button" id="resetWorkbenchBtn">
               <i data-lucide="rotate-ccw"></i>
@@ -770,92 +897,134 @@ function renderWorkbench() {
             </button>
           </div>
           <div class="panel-body">
-            <div class="prompt-intake">
-              <div class="field">
-                <label for="wbSourceBrief">一句话需求 / 剧情 / 镜头意图</label>
-                <textarea id="wbSourceBrief" class="brief-input" placeholder="例如：女主在夜色窗边压住愤怒，准备说出真相。">${escapeHtml(wb.sourceBrief || "")}</textarea>
-              </div>
-              <div class="reference-card">
-                <div>
-                  <p class="eyebrow">参考图</p>
-                  <strong>${wb.referenceImageName ? escapeHtml(wb.referenceImageName) : "可选上传"}</strong>
-                  <span>${wb.mode === "image" ? "用于识别画面、构图、光影和风格。" : "用于识别场景空间、人物站位、光线来源和镜头条件。"}</span>
-                </div>
-                <label class="secondary-button compact" for="wbReferenceImage">
-                  <i data-lucide="image-plus"></i>
-                  选择图片
-                </label>
-                <input id="wbReferenceImage" type="file" accept="image/*" hidden />
-              </div>
-              <div class="field">
-                <label for="wbReferenceNote">参考图识别重点</label>
-                <textarea id="wbReferenceNote">${escapeHtml(wb.referenceNote || "")}</textarea>
-              </div>
+            <div class="field hero-field">
+              <label for="wbSourceBrief">这一镜头想表达什么？</label>
+              <textarea id="wbSourceBrief" class="brief-input" data-workbench-field="sourceBrief" placeholder="例如：女主发现男主欺骗自己后，强忍愤怒，没有立刻爆发，只是冷冷地看着他。">${escapeHtml(wb.sourceBrief || "")}</textarea>
             </div>
-
+            <div class="reference-card">
+              <div>
+                <p class="eyebrow">参考图</p>
+                <strong>${wb.referenceImageName ? escapeHtml(wb.referenceImageName) : "可选上传"}</strong>
+                <span>${wb.mode === "image" ? "用于识别画面、构图、光影和风格。" : "用于识别场景空间、人物站位、光线来源和镜头条件。"}</span>
+              </div>
+              <label class="secondary-button compact" for="wbReferenceImage">
+                <i data-lucide="image-plus"></i>
+                选择图片
+              </label>
+              <input id="wbReferenceImage" type="file" accept="image/*" hidden />
+            </div>
+            <div class="field">
+              <label for="wbReferenceNote">参考图识别重点</label>
+              <textarea id="wbReferenceNote" data-workbench-field="referenceNote">${escapeHtml(wb.referenceNote || "")}</textarea>
+            </div>
             ${renderInsightPackage(role)}
-
-            <div class="field">
-              <label for="wbSceneGoal">当前创作目标</label>
-              <textarea id="wbSceneGoal">${escapeHtml(wb.sceneGoal)}</textarea>
+            <div class="field-grid two-col">
+              <div class="field">
+                <label for="wbSceneGoal">当前创作目标</label>
+                <textarea id="wbSceneGoal" data-workbench-field="sceneGoal">${escapeHtml(wb.sceneGoal || "")}</textarea>
+              </div>
+              <div class="field">
+                <label for="wbFrameDescription">当前画面描述</label>
+                <textarea id="wbFrameDescription" data-workbench-field="frameDescription">${escapeHtml(wb.frameDescription || "")}</textarea>
+              </div>
             </div>
-            <div class="field">
-              <label for="wbFrameDescription">当前画面描述</label>
-              <textarea id="wbFrameDescription">${escapeHtml(wb.frameDescription)}</textarea>
-            </div>
+            <section class="builder-section">
+              <h3>角色状态与关系张力</h3>
+              ${renderChoiceGroup("角色状态", "characterState", CHARACTER_STATES)}
+              ${renderChoiceGroup("关系张力", "relationTension", RELATION_TENSIONS)}
+            </section>
+            <section class="builder-section">
+              <h3>镜头与构图</h3>
+              ${renderChoiceGroup("景别", "shotSize", SHOT_SIZES)}
+              ${renderChoiceGroup("机位", "cameraAngle", CAMERA_ANGLES)}
+              ${renderChoiceGroup("构图", "composition", COMPOSITIONS)}
+            </section>
+            <section class="builder-section">
+              <h3>动作与站位</h3>
+              ${renderChoiceGroup("人物站位", "blocking", BLOCKING_OPTIONS)}
+              ${renderChoiceGroup("动作", "action", ACTION_OPTIONS)}
+              <div class="field">
+                <label for="wbActionDetail">补充动作细节</label>
+                <textarea id="wbActionDetail" data-workbench-field="actionDetail" placeholder="例如：她的手指轻轻攥紧衣角，但脸上仍然保持克制。">${escapeHtml(wb.actionDetail || "")}</textarea>
+              </div>
+            </section>
+            <section class="builder-section">
+              <h3>微表情</h3>
+              ${renderChoiceGroup("眼神", "eye", EYE_OPTIONS)}
+              ${renderChoiceGroup("嘴部", "mouth", MOUTH_OPTIONS)}
+              ${renderChoiceGroup("呼吸", "breath", BREATH_OPTIONS)}
+              <div class="field">
+                <label for="wbExpressionDetail">补充微表情</label>
+                <textarea id="wbExpressionDetail" data-workbench-field="expressionDetail" placeholder="例如：眼尾微红，但不要哭出来。">${escapeHtml(wb.expressionDetail || "")}</textarea>
+              </div>
+            </section>
+            <section class="builder-section">
+              <h3>光影与质感</h3>
+              ${renderChoiceGroup("光线", "lightingControl", LIGHTING_OPTIONS)}
+              ${renderChoiceGroup("氛围", "atmosphere", ATMOSPHERE_OPTIONS)}
+              ${renderChoiceGroup("画面质感", "texture", TEXTURE_OPTIONS)}
+            </section>
             <div class="field">
               <label for="wbExtra">临时补充要求</label>
-              <textarea id="wbExtra">${escapeHtml(wb.extra)}</textarea>
+              <textarea id="wbExtra" data-workbench-field="extra">${escapeHtml(wb.extra || "")}</textarea>
             </div>
             ${role ? renderRoleSnapshot(role) : ""}
-            <div>
-              <p class="eyebrow">可锁定模块预览</p>
-              <div class="selected-modules">
-                ${MODULE_TYPES.map((type) => renderModuleEditor(type)).join("")}
-              </div>
-            </div>
           </div>
         </section>
 
-        <section class="panel result-column">
+        <section class="panel builder-column">
           <div class="panel-head">
             <div>
-              <h2>生成结果</h2>
-              <p>由专业拆解、角色资产和锁定模块组合，可继续编辑、复制和保存。</p>
+              <h2>参数与优化</h2>
+              <p>控制画幅、质量、运动幅度、负面提示词和快捷优化方向。</p>
             </div>
           </div>
-          <div class="result-box">
-            <div class="result-tabs">
-              ${[
-                ["zh", "中文"],
-                ["en", "英文"],
-                ["negative", "负面"],
-                ["json", "JSON"],
-              ].map(([id, label]) => `<button class="result-tab ${state.resultTab === id ? "is-active" : ""}" type="button" data-result-tab="${id}">${label}</button>`).join("")}
-            </div>
-            <textarea class="result-text" id="resultText">${escapeHtml(wb.results[state.resultTab] || "")}</textarea>
-            <div class="result-actions">
-              <div class="button-row">
-                <button class="primary-button" type="button" id="copyResultBtn">
-                  <i data-lucide="copy"></i>
-                  复制当前结果
-                </button>
-                <button class="secondary-button" type="button" id="regenerateBtn">
-                  <i data-lucide="refresh-cw"></i>
-                  重新组合
-                </button>
+          <div class="panel-body">
+            <section class="builder-section">
+              <h3>基础参数</h3>
+              ${PARAMETER_GROUPS.map((group) => renderParameterGroup(group)).join("")}
+            </section>
+            <section class="builder-section">
+              <h3>禁止项</h3>
+              <div class="negative-grid">
+                ${NEGATIVE_OPTIONS.map((item) => `
+                  <label class="check-chip">
+                    <input type="checkbox" value="${escapeHtml(item)}" data-negative-option ${wb.negativeOptions?.includes(item) ? "checked" : ""} />
+                    <span>${escapeHtml(item)}</span>
+                  </label>
+                `).join("")}
               </div>
-              <div class="button-row">
-                <button class="secondary-button" type="button" id="savePresetBtn">
-                  <i data-lucide="save"></i>
-                  保存为预设
-                </button>
-                <button class="secondary-button" type="button" id="saveVersionBtn">
-                  <i data-lucide="git-branch-plus"></i>
-                  保存为新版本
-                </button>
+              <div class="field">
+                <label for="wbCustomNegative">自定义补充</label>
+                <textarea id="wbCustomNegative" data-workbench-field="customNegative" placeholder="例如：不要脸型变化，不要欧化，不要过度柔焦。">${escapeHtml(wb.customNegative || "")}</textarea>
               </div>
-            </div>
+            </section>
+            <section class="builder-section">
+              <h3>一键优化方向</h3>
+              <div class="quick-optimization-grid">
+                ${OPTIMIZE_ACTIONS.map((item) => `
+                  <button class="quick-opt-button ${wb.optimizationNotes?.some((note) => note.id === item.id) ? "is-selected" : ""}" type="button" data-optimization="${item.id}">
+                    ${escapeHtml(item.label)}
+                  </button>
+                `).join("")}
+              </div>
+            </section>
+            <section class="builder-section">
+              <h3>插入模块</h3>
+              <div class="module-picker compact-picker">
+                ${MODULE_TYPES.map((type) => renderModuleSelect(type)).join("")}
+              </div>
+              <details class="module-drawer">
+                <summary>查看并手动修改已选模块</summary>
+                <div class="selected-modules">
+                  ${MODULE_TYPES.map((type) => renderModuleEditor(type)).join("")}
+                </div>
+              </details>
+            </section>
+            <section class="builder-section">
+              <h3>最近版本</h3>
+              ${renderVersionPreview()}
+            </section>
           </div>
         </section>
       </div>
@@ -863,6 +1032,180 @@ function renderWorkbench() {
   `;
 
   bindWorkbenchEvents();
+}
+
+function renderPromptResultHero() {
+  const wb = state.workbench;
+  const result = wb.results?.[state.resultTab] || "";
+  return `
+    <section class="prompt-result-hero" id="promptResultHero">
+      <div class="result-hero-head">
+        <div>
+          <p class="eyebrow">当前提示词结果</p>
+          <h2>${escapeHtml(wb.promptType || getWorkbenchTask())}</h2>
+          <p>选择提示词类型并填写画面目标后，这里会生成可复制、可编辑、可保存的专业提示词。</p>
+        </div>
+        <div class="result-main-actions">
+          <button class="primary-button" type="button" id="generatePromptBtn">
+            <i data-lucide="sparkles"></i>
+            生成提示词
+          </button>
+          <button class="secondary-button" type="button" id="copyResultBtn">
+            <i data-lucide="copy"></i>
+            复制
+          </button>
+          <button class="secondary-button" type="button" id="savePresetBtn">
+            <i data-lucide="save"></i>
+            保存到提示词库
+          </button>
+          <button class="ghost-button" type="button" id="topOptimizeBtn">
+            <i data-lucide="wand-sparkles"></i>
+            优化
+          </button>
+          <button class="ghost-button" type="button" id="clearWorkbenchBtn">
+            <i data-lucide="eraser"></i>
+            清空
+          </button>
+        </div>
+      </div>
+      <div class="result-box result-hero-box">
+        <div class="result-tabs">
+          ${[
+            ["zh", "中文提示词"],
+            ["en", "英文提示词"],
+            ["negative", "负面提示词"],
+            ["json", "结构化提示词"],
+          ].map(([id, label]) => `<button class="result-tab ${state.resultTab === id ? "is-active" : ""}" type="button" data-result-tab="${id}">${label}</button>`).join("")}
+        </div>
+        <textarea class="result-text top-result-text" id="resultText" placeholder="选择提示词类型并填写画面目标后，这里会生成可复制的专业提示词。">${escapeHtml(result)}</textarea>
+        <div class="result-meta-line">
+          <span>${escapeHtml(getWorkbenchMode().label)} / ${escapeHtml(getWorkbenchTask())}</span>
+          <span>${escapeHtml(wb.targetTool || "通用")} / ${escapeHtml(wb.aspectRatio || "9:16")} / ${escapeHtml(wb.quality || "高质量")}</span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderQuickStart() {
+  const wb = state.workbench;
+  return `
+    <section class="quick-start-section">
+      <div class="section-headline">
+        <div>
+          <p class="eyebrow">快速开始</p>
+          <h2>你想生成哪一种 AI 短视频提示词？</h2>
+        </div>
+        <p>选择一个任务类型，系统会自动展开对应的镜头、动作、表情与光影控制项。</p>
+      </div>
+      <div class="quick-start-grid">
+        ${QUICK_START_TASKS.map((item) => `
+          <button class="quick-start-card ${wb.quickTask === item.label ? "is-selected" : ""}" type="button" data-quick-task="${escapeHtml(item.label)}" data-quick-prompt-type="${escapeHtml(item.type)}">
+            <strong>${escapeHtml(item.label)}</strong>
+            <span>${escapeHtml(item.description)}</span>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderWorkbenchRoleCard(role) {
+  const wb = state.workbench;
+  if (!role) {
+    return `
+      <section class="role-callout">
+        <p class="eyebrow">角色资产</p>
+        <h3>未选择角色</h3>
+        <p>可以临时描述角色，也可以创建角色资产后复用固定项、可变项和禁止项。</p>
+        <div class="button-row">
+          <button class="secondary-button compact" type="button" id="useTemporaryRoleBtn">临时输入角色</button>
+          <button class="primary-button compact" type="button" data-create-role>创建角色</button>
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="role-callout">
+      <p class="eyebrow">当前角色资产</p>
+      <h3>${escapeHtml(role.name)} / ${escapeHtml(role.identity)}</h3>
+      <p>${escapeHtml(role.temperament)}</p>
+      <div class="role-mini-list">
+        <span><b>外观</b>${escapeHtml(compactText(role.fixed))}</span>
+        <span><b>禁止</b>${escapeHtml(compactText(role.forbidden))}</span>
+      </div>
+      <div class="field">
+        <label for="wbRole">更换角色</label>
+        <select id="wbRole">
+          <option value="">不使用角色</option>
+          ${state.roles.map((item) => `<option value="${item.id}" ${item.id === wb.roleId ? "selected" : ""}>${escapeHtml(item.name)} / ${escapeHtml(item.identity)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="button-row">
+        <button class="ghost-button compact" type="button" data-edit-role="${role.id}">
+          <i data-lucide="pencil"></i>
+          编辑
+        </button>
+        <button class="secondary-button compact" type="button" data-create-role>
+          <i data-lucide="plus"></i>
+          新建角色
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderChoiceGroup(label, key, options) {
+  const value = state.workbench[key] || "";
+  return `
+    <div class="choice-group">
+      <span>${escapeHtml(label)}</span>
+      <div class="chip-row">
+        ${options.map((option) => `
+          <button class="chip ${value === option ? "is-selected" : ""}" type="button" data-choice-key="${key}" data-choice-value="${escapeHtml(option)}">
+            ${escapeHtml(option)}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderParameterGroup(group) {
+  const value = state.workbench[group.key] || "";
+  return `
+    <div class="choice-group parameter-group">
+      <span>${escapeHtml(group.label)}</span>
+      <div class="segmented-row">
+        ${group.options.map((option) => `
+          <button class="segment-button ${value === option ? "is-selected" : ""}" type="button" data-choice-key="${group.key}" data-choice-value="${escapeHtml(option)}">
+            ${escapeHtml(option)}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderVersionPreview() {
+  const recent = state.presets.slice(0, 3);
+  if (!recent.length) return `<p class="empty-mini">保存结果后，这里会显示最近 3 条提示词版本。</p>`;
+  return `
+    <div class="mini-version-list">
+      ${recent.map((preset) => `
+        <div class="mini-version-row">
+          <div>
+            <strong>${escapeHtml(preset.title)}</strong>
+            <span>${escapeHtml(preset.type)} / ${preset.versions?.length || 1} 版</span>
+          </div>
+          <div class="button-row">
+            <button class="ghost-button compact" type="button" data-use-preset="${preset.id}">使用</button>
+            <button class="ghost-button compact" type="button" data-copy-preset="${preset.id}">复制</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderTaskStrip() {
@@ -1078,26 +1421,42 @@ function bindWorkbenchEvents() {
     });
   });
 
-  document.querySelectorAll("[data-workbench-task]").forEach((button) => {
+  document.querySelectorAll("[data-quick-task]").forEach((button) => {
     button.addEventListener("click", () => {
-      if (wb.mode === "image") {
-        wb.imageTask = button.dataset.workbenchTask;
-      } else {
-        wb.videoTask = button.dataset.workbenchTask;
+      wb.quickTask = button.dataset.quickTask;
+      wb.promptType = button.dataset.quickPromptType;
+      if (wb.promptType === "视频分镜提示词") {
+        wb.mode = "video";
+        wb.videoTask = "分镜 / 镜头序列";
       }
-      wb.promptType = getWorkbenchTask();
+      if (wb.promptType === "光影提示词") {
+        wb[wb.mode === "image" ? "imageTask" : "videoTask"] = wb.mode === "image" ? "光影氛围图" : "场景光影与相机参数";
+      }
       regenerateResults();
       renderWorkbench();
       refreshIcons();
     });
   });
 
-  document.getElementById("wbRole").addEventListener("change", (event) => {
-    wb.roleId = event.target.value;
-    regenerateResults();
-    renderWorkbench();
-    refreshIcons();
+  document.querySelectorAll("[data-prompt-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      wb.promptType = button.dataset.promptType;
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
   });
+
+  const roleSelect = document.getElementById("wbRole");
+  if (roleSelect) {
+    roleSelect.addEventListener("change", (event) => {
+      wb.roleId = event.target.value;
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  }
+
   document.getElementById("wbOutputFormat").addEventListener("change", (event) => {
     wb.outputFormat = event.target.value;
     regenerateResults();
@@ -1106,10 +1465,14 @@ function bindWorkbenchEvents() {
     wb.targetTool = event.target.value;
     regenerateResults();
   });
-  document.getElementById("wbSourceBrief").addEventListener("input", (event) => {
-    wb.sourceBrief = event.target.value;
-    regenerateResults();
+
+  document.querySelectorAll("[data-workbench-field]").forEach((field) => {
+    field.addEventListener("input", (event) => {
+      wb[event.target.dataset.workbenchField] = event.target.value;
+      regenerateResults();
+    });
   });
+
   document.getElementById("wbReferenceImage").addEventListener("change", (event) => {
     const file = event.target.files?.[0];
     wb.referenceImageName = file ? file.name : "";
@@ -1117,29 +1480,36 @@ function bindWorkbenchEvents() {
     renderWorkbench();
     refreshIcons();
   });
-  document.getElementById("wbReferenceNote").addEventListener("input", (event) => {
-    wb.referenceNote = event.target.value;
-    regenerateResults();
-  });
-  document.getElementById("wbSceneGoal").addEventListener("input", (event) => {
-    wb.sceneGoal = event.target.value;
-    regenerateResults();
-  });
-  document.getElementById("wbFrameDescription").addEventListener("input", (event) => {
-    wb.frameDescription = event.target.value;
-    regenerateResults();
-  });
-  document.getElementById("wbExtra").addEventListener("input", (event) => {
-    wb.extra = event.target.value;
-    regenerateResults();
-  });
 
-  document.querySelectorAll("[data-goal]").forEach((button) => {
+  document.querySelectorAll("[data-quick-scene]").forEach((button) => {
     button.addEventListener("click", () => {
-      wb.goal = button.dataset.goal;
+      wb.goal = button.dataset.quickScene;
+      if (!wb.sceneGoal || wb.sceneGoal === DEFAULT_STATE.workbench.sceneGoal) {
+        wb.sceneGoal = button.dataset.quickScene;
+      }
+      if (!wb.sourceBrief) {
+        wb.sourceBrief = `${button.dataset.quickScene}：`;
+      }
       regenerateResults();
       renderWorkbench();
       refreshIcons();
+    });
+  });
+
+  document.querySelectorAll("[data-choice-key]").forEach((button) => {
+    button.addEventListener("click", () => {
+      wb[button.dataset.choiceKey] = button.dataset.choiceValue;
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
+
+  document.querySelectorAll("[data-negative-option]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const checked = [...document.querySelectorAll("[data-negative-option]:checked")].map((item) => item.value);
+      wb.negativeOptions = checked;
+      regenerateResults();
     });
   });
 
@@ -1175,20 +1545,55 @@ function bindWorkbenchEvents() {
     saveState();
   });
 
-  document.getElementById("copyResultBtn").addEventListener("click", () => copyText(wb.results[state.resultTab] || ""));
-  document.getElementById("regenerateBtn").addEventListener("click", () => {
+  document.getElementById("generatePromptBtn").addEventListener("click", () => {
     regenerateResults();
     renderWorkbench();
-    showToast("已按当前资产重新组合提示词");
+    flashResultHero();
+    showToast("已生成提示词");
   });
+  document.getElementById("copyResultBtn").addEventListener("click", () => copyText(wb.results[state.resultTab] || ""));
   document.getElementById("savePresetBtn").addEventListener("click", saveCurrentPreset);
-  document.getElementById("saveVersionBtn").addEventListener("click", saveCurrentVersion);
+  document.getElementById("topOptimizeBtn").addEventListener("click", () => {
+    applyQuickOptimize("cinematic");
+    renderWorkbench();
+    showToast("已加入电影感优化方向");
+  });
+  document.getElementById("clearWorkbenchBtn").addEventListener("click", clearWorkbench);
+
   document.getElementById("applyInsightBtn").addEventListener("click", () => {
     applyInsightToEditor();
     regenerateResults();
     renderWorkbench();
     showToast("AI拆解方案已写入编辑区");
   });
+
+  document.querySelectorAll("[data-optimization]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyQuickOptimize(button.dataset.optimization);
+      renderWorkbench();
+      showToast(`已加入「${button.textContent.trim()}」优化`);
+    });
+  });
+
+  document.querySelectorAll("[data-create-role]").forEach((button) => button.addEventListener("click", () => openRoleModal()));
+  document.querySelectorAll("[data-edit-role]").forEach((button) => button.addEventListener("click", () => openRoleModal(getRole(button.dataset.editRole))));
+  document.querySelectorAll("[data-use-preset]").forEach((button) => button.addEventListener("click", () => usePreset(button.dataset.usePreset)));
+  document.querySelectorAll("[data-copy-preset]").forEach((button) => button.addEventListener("click", () => {
+    const preset = getPreset(button.dataset.copyPreset);
+    copyText([preset.zh, preset.en, preset.negative].filter(Boolean).join("\n\n"));
+  }));
+
+  const temporaryRole = document.getElementById("useTemporaryRoleBtn");
+  if (temporaryRole) {
+    temporaryRole.addEventListener("click", () => {
+      wb.roleId = "";
+      wb.extra = [wb.extra, "临时角色描述：请在当前创作目标中补充角色外观、身份、气质与禁止项。"].filter(Boolean).join("\n");
+      regenerateResults();
+      renderWorkbench();
+      showToast("已切换为临时角色描述");
+    });
+  }
+
   document.getElementById("resetWorkbenchBtn").addEventListener("click", () => {
     state.workbench = clone(DEFAULT_STATE.workbench);
     regenerateResults();
@@ -1196,6 +1601,47 @@ function bindWorkbenchEvents() {
     renderWorkbench();
     showToast("工作台已恢复为示例配置");
   });
+}
+
+function applyQuickOptimize(id) {
+  const wb = state.workbench;
+  const action = OPTIMIZE_ACTIONS.find((item) => item.id === id);
+  if (!action) return;
+  wb.optimizationNotes = wb.optimizationNotes || [];
+  const exists = wb.optimizationNotes.some((item) => item.id === id);
+  if (!exists) wb.optimizationNotes.push(action);
+  if (id === "english") wb.outputFormat = "英文提示词";
+  if (id === "bilingual") wb.outputFormat = "中英双语";
+  if (id === "kling") wb.targetTool = "可灵";
+  if (id === "jimeng") wb.targetTool = "即梦";
+  if (id === "midjourney") {
+    wb.mode = "image";
+    wb.targetTool = "Midjourney";
+    wb.aspectRatio = wb.aspectRatio || "9:16";
+  }
+  regenerateResults();
+}
+
+function clearWorkbench() {
+  const ok = confirm("确认清空当前工作台内容吗？角色资产和模块库不会被删除。");
+  if (!ok) return;
+  state.workbench = {
+    ...clone(DEFAULT_STATE.workbench),
+    roleId: state.workbench.roleId,
+    selectedModuleIds: { ...state.workbench.selectedModuleIds },
+  };
+  regenerateResults();
+  saveState();
+  renderWorkbench();
+  showToast("当前工作台已清空并保留资产选择");
+}
+
+function flashResultHero() {
+  const hero = document.getElementById("promptResultHero");
+  if (!hero) return;
+  hero.classList.add("is-updated");
+  hero.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.setTimeout(() => hero.classList.remove("is-updated"), 1000);
 }
 
 function applyInsightToEditor() {
@@ -1232,6 +1678,33 @@ function composePrompt() {
   const mode = getWorkbenchMode();
   const task = getWorkbenchTask();
   const guidance = wb.mode === "video" ? getVideoTaskGuidance(task) : getImageTaskGuidance(task);
+  const optimizationZh = (wb.optimizationNotes || []).map((item) => item.zh).filter(Boolean);
+  const optimizationEn = (wb.optimizationNotes || []).map((item) => item.en).filter(Boolean);
+  const coreControls = [
+    `角色状态：${wb.characterState || "未选择"}`,
+    `关系张力：${wb.relationTension || "未选择"}`,
+    `景别：${wb.shotSize || "未选择"}`,
+    `机位：${wb.cameraAngle || "未选择"}`,
+    `构图：${wb.composition || "未选择"}`,
+    `人物站位：${wb.blocking || "未选择"}`,
+    `动作：${wb.action || "未选择"}`,
+    wb.actionDetail ? `动作细节：${wb.actionDetail}` : "",
+    `眼神：${wb.eye || "未选择"}`,
+    `嘴部：${wb.mouth || "未选择"}`,
+    `呼吸：${wb.breath || "未选择"}`,
+    wb.expressionDetail ? `微表情补充：${wb.expressionDetail}` : "",
+    `光线：${wb.lightingControl || "未选择"}`,
+    `氛围：${wb.atmosphere || "未选择"}`,
+    `画面质感：${wb.texture || "未选择"}`,
+  ].filter(Boolean);
+  const parameterLines = [
+    `画幅比例：${wb.aspectRatio || "9:16"}`,
+    `画面质量：${wb.quality || "高质量"}`,
+    `风格强度：${wb.styleStrength || "中"}`,
+    `运动幅度：${wb.motionLevel || "轻微"}`,
+    `镜头速度：${wb.cameraSpeed || "慢"}`,
+    `情绪强度：${wb.emotionIntensity || "克制"}`,
+  ];
   const selectedModules = MODULE_TYPES.map((type) => {
     const module = getModule(wb.selectedModuleIds[type.id]);
     if (!module) return null;
@@ -1256,6 +1729,8 @@ function composePrompt() {
   const negativeModule = selectedModules.find((item) => item.type.id === "negative");
   const negative = [
     role?.forbidden ? `角色禁止项：${lineToSentence(role.forbidden)}` : "",
+    ...(wb.negativeOptions || []),
+    wb.customNegative ? `自定义禁止项：${wb.customNegative}` : "",
     negativeModule ? `模块负面约束：${negativeModule.zh}` : "",
     "不要出现肢体扭曲、面部崩坏、五官漂移、手指错误、镜头脏污、低清晰度、廉价塑料质感。",
   ].filter(Boolean).join("\n");
@@ -1310,14 +1785,23 @@ function composePrompt() {
     "【角色资产】",
     roleZh,
     "",
+    "【核心控制项】",
+    coreControls.join("\n"),
+    "",
     "【当前创作目标】",
     wb.sceneGoal || "请补充当前创作目标。",
     "",
     "【当前画面描述】",
     wb.frameDescription || "请补充画面描述。",
     "",
+    "【基础参数】",
+    parameterLines.join("\n"),
+    "",
     "【关键控制模块】",
     moduleZh || "未选择模块。",
+    "",
+    "【快捷优化方向】",
+    optimizationZh.length ? optimizationZh.join("\n") : "无。",
     "",
     "【临时补充要求】",
     wb.extra || "无。",
@@ -1346,14 +1830,23 @@ function composePrompt() {
     "[Character Asset]",
     roleEn,
     "",
+    "[Core Controls]",
+    coreControls.join("\n"),
+    "",
     "[Creative Goal]",
     wb.sceneGoal || "Please add the current creative goal.",
     "",
     "[Frame Description]",
     wb.frameDescription || "Please add the current frame description.",
     "",
+    "[Parameters]",
+    parameterLines.join("\n"),
+    "",
     "[Control Modules]",
     moduleEn || "No module selected.",
+    "",
+    "[Optimization Direction]",
+    optimizationEn.length ? optimizationEn.join("\n") : "None.",
     "",
     "[Extra Requirements]",
     wb.extra || "None.",
@@ -1378,6 +1871,31 @@ function composePrompt() {
       role: role ? { id: role.id, name: role.name, fixed: lines(role.fixed), variable: lines(role.variable), forbidden: lines(role.forbidden) } : null,
       sceneGoal: wb.sceneGoal,
       frameDescription: wb.frameDescription,
+      coreControls: {
+        characterState: wb.characterState,
+        relationTension: wb.relationTension,
+        shotSize: wb.shotSize,
+        cameraAngle: wb.cameraAngle,
+        composition: wb.composition,
+        blocking: wb.blocking,
+        action: wb.action,
+        actionDetail: wb.actionDetail,
+        eye: wb.eye,
+        mouth: wb.mouth,
+        breath: wb.breath,
+        expressionDetail: wb.expressionDetail,
+        lighting: wb.lightingControl,
+        atmosphere: wb.atmosphere,
+        texture: wb.texture,
+      },
+      parameters: {
+        aspectRatio: wb.aspectRatio,
+        quality: wb.quality,
+        styleStrength: wb.styleStrength,
+        motionLevel: wb.motionLevel,
+        cameraSpeed: wb.cameraSpeed,
+        emotionIntensity: wb.emotionIntensity,
+      },
       modules: selectedModules.map((item) => ({
         type: item.type.label,
         name: item.module.name,
@@ -1385,6 +1903,7 @@ function composePrompt() {
         en: item.en,
         tags: item.module.tags,
       })),
+      optimizationNotes: wb.optimizationNotes || [],
       negativePrompt: negative,
       extra: wb.extra,
     },

@@ -625,6 +625,336 @@ h3 {
   line-height: 1.65;
 }
 
+.task-workbench {
+  display: grid;
+  gap: 16px;
+}
+
+.prompt-result-hero {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.prompt-result-hero.is-updated {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow);
+}
+
+.result-hero-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.result-hero-head h2,
+.section-headline h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 1.7vw, 1.7rem);
+}
+
+.result-hero-head p:last-child,
+.section-headline > p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.result-main-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.result-hero-box {
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.top-result-text {
+  min-height: 184px;
+  max-height: 320px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.result-meta-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 0.78rem;
+}
+
+.quick-start-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.section-headline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 16px;
+  align-items: end;
+}
+
+.quick-start-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quick-start-card {
+  display: grid;
+  min-height: 104px;
+  align-content: start;
+  gap: 8px;
+  padding: 14px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.quick-start-card:hover {
+  transform: translateY(-1px);
+}
+
+.quick-start-card strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.quick-start-card span {
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.quick-start-card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.prompt-builder-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(480px, 1fr) minmax(300px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.builder-column {
+  min-width: 0;
+}
+
+.main-builder-column .panel-body {
+  gap: 16px;
+}
+
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mode-tab,
+.type-button,
+.segment-button,
+.quick-opt-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.82rem;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.mode-tab svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mode-tab.is-active,
+.type-button.is-selected,
+.segment-button.is-selected,
+.quick-opt-button.is-selected {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.prompt-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.role-callout,
+.builder-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.role-callout h3,
+.builder-section h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.role-callout p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.role-mini-list {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.role-mini-list span {
+  display: grid;
+  gap: 2px;
+}
+
+.role-mini-list b {
+  color: var(--text);
+}
+
+.hero-field textarea {
+  min-height: 150px;
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: color-mix(in srgb, var(--surface) 88%, var(--accent-soft));
+  font-size: 1rem;
+}
+
+.choice-group {
+  display: grid;
+  gap: 8px;
+}
+
+.choice-group > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.segmented-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.negative-grid,
+.quick-optimization-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.check-chip {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.78rem;
+}
+
+.check-chip input {
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.compact-picker {
+  gap: 8px;
+}
+
+.module-drawer {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.module-drawer summary {
+  padding: 10px 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.module-drawer .selected-modules {
+  padding: 0 10px 10px;
+}
+
+.mini-version-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-version-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.mini-version-row strong,
+.mini-version-row span {
+  display: block;
+}
+
+.mini-version-row strong {
+  font-size: 0.84rem;
+}
+
+.mini-version-row span,
+.empty-mini {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
 .panel,
 .asset-card,
 .result-box,
@@ -869,6 +1199,11 @@ button.chip.is-selected,
   background: transparent;
   font-size: 0.9rem;
   line-height: 1.65;
+}
+
+.top-result-text {
+  min-height: 184px;
+  max-height: 320px;
 }
 
 .result-actions {
@@ -1320,12 +1655,24 @@ tr:last-child td {
     grid-template-columns: minmax(280px, 330px) minmax(420px, 1fr);
   }
 
+  .prompt-builder-grid {
+    grid-template-columns: minmax(260px, 320px) minmax(420px, 1fr);
+  }
+
   .result-column {
+    grid-column: 1 / -1;
+  }
+
+  .prompt-builder-grid > .builder-column:last-child {
     grid-column: 1 / -1;
   }
 
   .result-text {
     min-height: 320px;
+  }
+
+  .quick-start-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1380,8 +1727,27 @@ tr:last-child td {
   .workbench-layout,
   .pro-workbench-layout,
   .workbench-mode-hero,
+  .prompt-builder-grid,
+  .section-headline,
   .tag-manager {
     grid-template-columns: 1fr;
+  }
+
+  .prompt-builder-grid > .builder-column:last-child {
+    grid-column: auto;
+  }
+
+  .prompt-result-hero {
+    position: static;
+  }
+
+  .result-hero-head {
+    grid-template-columns: 1fr;
+  }
+
+  .result-main-actions {
+    justify-content: flex-start;
+    max-width: none;
   }
 
   .insight-grid {
@@ -1397,7 +1763,8 @@ tr:last-child td {
   }
 
   .asset-grid,
-  .stat-grid {
+  .stat-grid,
+  .quick-start-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1418,6 +1785,23 @@ tr:last-child td {
     width: 100%;
   }
 
+  .prompt-result-hero,
+  .quick-start-section,
+  .role-callout,
+  .builder-section {
+    padding: 12px;
+  }
+
+  .result-main-actions,
+  .result-meta-line {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .result-main-actions > button {
+    width: 100%;
+  }
+
   .search-field,
   .module-search-field,
   .toolbar-filters select,
@@ -1431,8 +1815,21 @@ tr:last-child td {
   }
 
   .mode-switcher,
+  .mode-tabs,
+  .prompt-type-grid,
+  .negative-grid,
+  .quick-optimization-grid,
+  .segmented-row,
   .reference-card {
     grid-template-columns: 1fr;
+  }
+
+  .quick-start-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .top-result-text {
+    min-height: 220px;
   }
 
   .checkbox-grid {
