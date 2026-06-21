@@ -193,6 +193,15 @@ const OPTIMIZE_ACTIONS = [
   { id: "midjourney", label: "适配 Midjourney", zh: "强化图像关键词、构图、光影、风格参数和画幅表达。", en: "Midjourney-ready visual keywords, composition, lighting, style and aspect ratio" },
 ];
 
+const GENERATOR_CATEGORIES = [
+  { id: "styles", label: "Styles", icon: "image", groups: [{ label: "画面风格", key: "texture", options: TEXTURE_OPTIONS }] },
+  { id: "lighting", label: "Lighting", icon: "lightbulb", groups: [{ label: "光线", key: "lightingControl", options: LIGHTING_OPTIONS }, { label: "氛围", key: "atmosphere", options: ATMOSPHERE_OPTIONS }] },
+  { id: "camera", label: "Camera", icon: "camera", groups: [{ label: "景别", key: "shotSize", options: SHOT_SIZES }, { label: "机位", key: "cameraAngle", options: CAMERA_ANGLES }, { label: "构图", key: "composition", options: COMPOSITIONS }] },
+  { id: "action", label: "Action", icon: "move-3d", groups: [{ label: "站位", key: "blocking", options: BLOCKING_OPTIONS }, { label: "动作", key: "action", options: ACTION_OPTIONS }] },
+  { id: "expression", label: "Expression", icon: "sparkles", groups: [{ label: "角色状态", key: "characterState", options: CHARACTER_STATES }, { label: "眼神", key: "eye", options: EYE_OPTIONS }, { label: "嘴部", key: "mouth", options: MOUTH_OPTIONS }, { label: "呼吸", key: "breath", options: BREATH_OPTIONS }] },
+  { id: "negative", label: "Negative", icon: "shield-x", groups: [] },
+];
+
 const DEFAULT_STATE = {
   theme: "dark",
   activeView: "workbench",
@@ -216,6 +225,7 @@ const DEFAULT_STATE = {
     outputFormat: "中英双语",
     targetTool: "可灵",
     quickTask: "单镜头画面提示词",
+    activeCategory: "lighting",
     characterState: "克制",
     relationTension: "对峙",
     shotSize: "近景",
@@ -813,6 +823,7 @@ function renderNav() {
 function render() {
   const item = NAV_ITEMS.find((entry) => entry.id === state.activeView) || NAV_ITEMS[0];
   const mode = getWorkbenchMode();
+  document.body.classList.toggle("simple-workbench-mode", state.activeView === "workbench");
   dom.pageTitle.textContent = state.activeView === "workbench" ? mode.title : item.title;
   renderNav();
 
@@ -832,206 +843,149 @@ function renderWorkbench() {
   const role = getRole(wb.roleId);
 
   dom.view.innerHTML = `
-    <div class="task-workbench">
-      ${renderPromptResultHero()}
-      ${renderQuickStart()}
-
-      <div class="prompt-builder-grid">
-        <section class="panel builder-column">
-          <div class="panel-head">
-            <div>
-              <h2>选择任务</h2>
-              <p>先确定生成类型、角色资产、场景入口和目标工具。</p>
-            </div>
-          </div>
-          <div class="panel-body">
-            <div class="mode-tabs" aria-label="图片与视频提示词模式">
-              ${WORKBENCH_MODES.map((item) => `
-                <button class="mode-tab ${wb.mode === item.id ? "is-active" : ""}" type="button" data-workbench-mode="${item.id}">
-                  <i data-lucide="${item.icon}"></i>
-                  ${escapeHtml(item.label)}
-                </button>
-              `).join("")}
-            </div>
-            <div class="field">
-              <span class="label">提示词类型</span>
-              <div class="prompt-type-grid">
-                ${PROMPT_TYPE_BUTTONS.map((item) => `
-                  <button class="type-button ${wb.promptType === item.value ? "is-selected" : ""}" type="button" data-prompt-type="${escapeHtml(item.value)}">
-                    ${escapeHtml(item.label)}
-                  </button>
-                `).join("")}
-              </div>
-            </div>
-            ${renderWorkbenchRoleCard(role)}
-            <div class="field">
-              <span class="label">快捷场景</span>
-              <div class="chip-row">
-                ${QUICK_SCENES.map((scene) => `
-                  <button class="chip ${wb.goal === scene ? "is-selected" : ""}" type="button" data-quick-scene="${escapeHtml(scene)}">
-                    ${escapeHtml(scene)}
-                  </button>
-                `).join("")}
-              </div>
-            </div>
-            <div class="field">
-              <label for="wbTargetTool">输出给哪个工具？</label>
-              <select id="wbTargetTool">${optionList(unique(["通用", ...TARGET_TOOLS, "自定义"]), wb.targetTool)}</select>
-            </div>
-            <div class="field">
-              <label for="wbOutputFormat">输出格式</label>
-              <select id="wbOutputFormat">${optionList(OUTPUT_FORMATS, wb.outputFormat)}</select>
-            </div>
-          </div>
+    <div class="simple-generator-page">
+      ${renderSimpleGeneratorHeader()}
+      <section class="simple-generator">
+        <h2>AI ReelShorts Prompt Generator</h2>
+        <textarea id="wbSourceBrief" class="simple-main-input" data-workbench-field="sourceBrief" placeholder="Start typing your main idea...">${escapeHtml(wb.sourceBrief || "")}</textarea>
+        <textarea id="resultText" class="simple-result-input" placeholder="/video prompt:">${escapeHtml(wb.results[state.resultTab] || "")}</textarea>
+        <div class="simple-action-row">
+          <button class="pf-button pf-blue" type="button" id="copyResultBtn">
+            <i data-lucide="copy"></i>
+            Copy Prompt
+          </button>
+          <button class="pf-button pf-green" type="button" id="savePresetBtn">
+            <i data-lucide="save"></i>
+            Save to My Prompts
+          </button>
+          <button class="pf-button pf-red" type="button" id="topOptimizeBtn">
+            <i data-lucide="wand-sparkles"></i>
+            Optimize
+          </button>
+        </div>
+        <section class="simple-params-card">
+          ${renderSimpleParameterGrid(role)}
+          ${renderSimpleCategoryTabs()}
+          ${renderSimpleCategoryPanel()}
+          <label class="pf-button pf-green upload-button" for="wbReferenceImage">
+            <i data-lucide="upload"></i>
+            Upload Inspirational Image
+          </label>
+          <input id="wbReferenceImage" type="file" accept="image/*" hidden />
+          <div class="simple-file-note">${wb.referenceImageName ? `已选择参考图：${escapeHtml(wb.referenceImageName)}` : "可选：上传电影静帧或场景图，辅助判断光影、构图和相机参数。"}</div>
+          <button class="pf-button pf-blue clear-button" type="button" id="clearWorkbenchBtn">
+            Clear All
+          </button>
         </section>
-
-        <section class="panel builder-column main-builder-column">
-          <div class="panel-head">
-            <div>
-              <h2>画面与镜头控制</h2>
-              <p>填写这一镜头的表达目标，再调整镜头、动作、微表情和光影。</p>
-            </div>
-            <button class="secondary-button compact" type="button" id="resetWorkbenchBtn">
-              <i data-lucide="rotate-ccw"></i>
-              重置
-            </button>
-          </div>
-          <div class="panel-body">
-            <div class="field hero-field">
-              <label for="wbSourceBrief">这一镜头想表达什么？</label>
-              <textarea id="wbSourceBrief" class="brief-input" data-workbench-field="sourceBrief" placeholder="例如：女主发现男主欺骗自己后，强忍愤怒，没有立刻爆发，只是冷冷地看着他。">${escapeHtml(wb.sourceBrief || "")}</textarea>
-            </div>
-            <div class="reference-card">
-              <div>
-                <p class="eyebrow">参考图</p>
-                <strong>${wb.referenceImageName ? escapeHtml(wb.referenceImageName) : "可选上传"}</strong>
-                <span>${wb.mode === "image" ? "用于识别画面、构图、光影和风格。" : "用于识别场景空间、人物站位、光线来源和镜头条件。"}</span>
-              </div>
-              <label class="secondary-button compact" for="wbReferenceImage">
-                <i data-lucide="image-plus"></i>
-                选择图片
-              </label>
-              <input id="wbReferenceImage" type="file" accept="image/*" hidden />
-            </div>
-            <div class="field">
-              <label for="wbReferenceNote">参考图识别重点</label>
-              <textarea id="wbReferenceNote" data-workbench-field="referenceNote">${escapeHtml(wb.referenceNote || "")}</textarea>
-            </div>
-            ${renderInsightPackage(role)}
-            <div class="field-grid two-col">
-              <div class="field">
-                <label for="wbSceneGoal">当前创作目标</label>
-                <textarea id="wbSceneGoal" data-workbench-field="sceneGoal">${escapeHtml(wb.sceneGoal || "")}</textarea>
-              </div>
-              <div class="field">
-                <label for="wbFrameDescription">当前画面描述</label>
-                <textarea id="wbFrameDescription" data-workbench-field="frameDescription">${escapeHtml(wb.frameDescription || "")}</textarea>
-              </div>
-            </div>
-            <section class="builder-section">
-              <h3>角色状态与关系张力</h3>
-              ${renderChoiceGroup("角色状态", "characterState", CHARACTER_STATES)}
-              ${renderChoiceGroup("关系张力", "relationTension", RELATION_TENSIONS)}
-            </section>
-            <section class="builder-section">
-              <h3>镜头与构图</h3>
-              ${renderChoiceGroup("景别", "shotSize", SHOT_SIZES)}
-              ${renderChoiceGroup("机位", "cameraAngle", CAMERA_ANGLES)}
-              ${renderChoiceGroup("构图", "composition", COMPOSITIONS)}
-            </section>
-            <section class="builder-section">
-              <h3>动作与站位</h3>
-              ${renderChoiceGroup("人物站位", "blocking", BLOCKING_OPTIONS)}
-              ${renderChoiceGroup("动作", "action", ACTION_OPTIONS)}
-              <div class="field">
-                <label for="wbActionDetail">补充动作细节</label>
-                <textarea id="wbActionDetail" data-workbench-field="actionDetail" placeholder="例如：她的手指轻轻攥紧衣角，但脸上仍然保持克制。">${escapeHtml(wb.actionDetail || "")}</textarea>
-              </div>
-            </section>
-            <section class="builder-section">
-              <h3>微表情</h3>
-              ${renderChoiceGroup("眼神", "eye", EYE_OPTIONS)}
-              ${renderChoiceGroup("嘴部", "mouth", MOUTH_OPTIONS)}
-              ${renderChoiceGroup("呼吸", "breath", BREATH_OPTIONS)}
-              <div class="field">
-                <label for="wbExpressionDetail">补充微表情</label>
-                <textarea id="wbExpressionDetail" data-workbench-field="expressionDetail" placeholder="例如：眼尾微红，但不要哭出来。">${escapeHtml(wb.expressionDetail || "")}</textarea>
-              </div>
-            </section>
-            <section class="builder-section">
-              <h3>光影与质感</h3>
-              ${renderChoiceGroup("光线", "lightingControl", LIGHTING_OPTIONS)}
-              ${renderChoiceGroup("氛围", "atmosphere", ATMOSPHERE_OPTIONS)}
-              ${renderChoiceGroup("画面质感", "texture", TEXTURE_OPTIONS)}
-            </section>
-            <div class="field">
-              <label for="wbExtra">临时补充要求</label>
-              <textarea id="wbExtra" data-workbench-field="extra">${escapeHtml(wb.extra || "")}</textarea>
-            </div>
-            ${role ? renderRoleSnapshot(role) : ""}
-          </div>
-        </section>
-
-        <section class="panel builder-column">
-          <div class="panel-head">
-            <div>
-              <h2>参数与优化</h2>
-              <p>控制画幅、质量、运动幅度、负面提示词和快捷优化方向。</p>
-            </div>
-          </div>
-          <div class="panel-body">
-            <section class="builder-section">
-              <h3>基础参数</h3>
-              ${PARAMETER_GROUPS.map((group) => renderParameterGroup(group)).join("")}
-            </section>
-            <section class="builder-section">
-              <h3>禁止项</h3>
-              <div class="negative-grid">
-                ${NEGATIVE_OPTIONS.map((item) => `
-                  <label class="check-chip">
-                    <input type="checkbox" value="${escapeHtml(item)}" data-negative-option ${wb.negativeOptions?.includes(item) ? "checked" : ""} />
-                    <span>${escapeHtml(item)}</span>
-                  </label>
-                `).join("")}
-              </div>
-              <div class="field">
-                <label for="wbCustomNegative">自定义补充</label>
-                <textarea id="wbCustomNegative" data-workbench-field="customNegative" placeholder="例如：不要脸型变化，不要欧化，不要过度柔焦。">${escapeHtml(wb.customNegative || "")}</textarea>
-              </div>
-            </section>
-            <section class="builder-section">
-              <h3>一键优化方向</h3>
-              <div class="quick-optimization-grid">
-                ${OPTIMIZE_ACTIONS.map((item) => `
-                  <button class="quick-opt-button ${wb.optimizationNotes?.some((note) => note.id === item.id) ? "is-selected" : ""}" type="button" data-optimization="${item.id}">
-                    ${escapeHtml(item.label)}
-                  </button>
-                `).join("")}
-              </div>
-            </section>
-            <section class="builder-section">
-              <h3>插入模块</h3>
-              <div class="module-picker compact-picker">
-                ${MODULE_TYPES.map((type) => renderModuleSelect(type)).join("")}
-              </div>
-              <details class="module-drawer">
-                <summary>查看并手动修改已选模块</summary>
-                <div class="selected-modules">
-                  ${MODULE_TYPES.map((type) => renderModuleEditor(type)).join("")}
-                </div>
-              </details>
-            </section>
-            <section class="builder-section">
-              <h3>最近版本</h3>
-              ${renderVersionPreview()}
-            </section>
-          </div>
-        </section>
-      </div>
+      </section>
     </div>
   `;
 
   bindWorkbenchEvents();
+}
+
+function renderSimpleGeneratorHeader() {
+  return `
+    <header class="simple-generator-header">
+      <a class="simple-logo" href="#workbench" aria-label="返回工作台">
+        <span class="simple-logo-mark">AP</span>
+        <strong>Prompt<span>Control</span></strong>
+      </a>
+      <nav>
+        <a href="#roles">角色资产</a>
+        <a href="#modules">模块库</a>
+        <a href="#presets">提示词库</a>
+      </nav>
+      <div class="simple-header-actions">
+        <button class="pf-outline" type="button" id="simpleExportBtn">Export</button>
+        <button class="pf-button pf-blue" type="button" id="generatePromptBtn">Generate</button>
+      </div>
+    </header>
+  `;
+}
+
+function renderSimpleParameterGrid(role) {
+  const wb = state.workbench;
+  const tools = unique(["通用", ...TARGET_TOOLS, "自定义"]);
+  return `
+    <div class="simple-param-grid">
+      ${renderSimpleSelect("Prompt Type", "wbPromptType", PROMPT_TYPES, wb.promptType)}
+      ${renderSimpleSelect("Role Asset", "wbRole", ["::不使用角色", ...state.roles.map((item) => `${item.id}::${item.name} / ${item.identity}`)], role ? `${role.id}::${role.name} / ${role.identity}` : "", true)}
+      ${renderSimpleSelect("Target Tool", "wbTargetTool", tools, wb.targetTool)}
+      ${renderSimpleSelect("Aspect Ratio", "wbAspectRatio", PARAMETER_GROUPS[0].options, wb.aspectRatio)}
+      ${renderSimpleSelect("Quality", "wbQuality", PARAMETER_GROUPS[1].options, wb.quality)}
+      ${renderSimpleSelect("Output", "wbOutputFormat", OUTPUT_FORMATS, wb.outputFormat)}
+      ${renderSimpleInput("Motion", "wbMotionLevel", wb.motionLevel || "", "静态 / 轻微 / 中等 / 明显")}
+      ${renderSimpleInput("Camera Speed", "wbCameraSpeed", wb.cameraSpeed || "", "慢 / 中 / 快")}
+      ${renderSimpleInput("Emotion", "wbEmotionIntensity", wb.emotionIntensity || "", "克制 / 中等 / 强烈")}
+      ${renderSimpleInput("Scene Goal", "wbSceneGoal", wb.sceneGoal || "", "例如：夜色窗边强忍愤怒")}
+      ${renderSimpleInput("Action Detail", "wbActionDetail", wb.actionDetail || "", "补充动作细节")}
+      ${renderSimpleInput("Exclude", "wbCustomNegative", wb.customNegative || "", "Avoid these terms in the prompt")}
+    </div>
+  `;
+}
+
+function renderSimpleSelect(label, id, options, value, encoded = false) {
+  return `
+    <label class="simple-control" for="${id}">
+      <span><i data-lucide="info"></i>${escapeHtml(label)}</span>
+      <select id="${id}">
+        ${options.map((item) => {
+          const optionValue = encoded && String(item).includes("::") ? String(item).split("::")[0] : item;
+          const optionLabel = encoded && String(item).includes("::") ? String(item).split("::")[1] : item;
+          const selected = encoded ? String(value).startsWith(`${optionValue}::`) || value === optionValue : item === value;
+          return `<option value="${escapeHtml(optionValue)}" ${selected ? "selected" : ""}>${escapeHtml(optionLabel)}</option>`;
+        }).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function renderSimpleInput(label, id, value, placeholder) {
+  return `
+    <label class="simple-control" for="${id}">
+      <span><i data-lucide="info"></i>${escapeHtml(label)}</span>
+      <input id="${id}" type="text" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
+    </label>
+  `;
+}
+
+function renderSimpleCategoryTabs() {
+  const active = state.workbench.activeCategory || "lighting";
+  return `
+    <div class="simple-category-tabs">
+      ${GENERATOR_CATEGORIES.map((item) => `
+        <button class="simple-category ${active === item.id ? "is-active" : ""}" type="button" data-generator-category="${item.id}">
+          <i data-lucide="${item.icon}"></i>
+          ${escapeHtml(item.label)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderSimpleCategoryPanel() {
+  const wb = state.workbench;
+  const category = GENERATOR_CATEGORIES.find((item) => item.id === (wb.activeCategory || "lighting")) || GENERATOR_CATEGORIES[1];
+  if (category.id === "negative") {
+    return `
+      <div class="simple-category-panel">
+        <div class="negative-grid simple-negative-grid">
+          ${NEGATIVE_OPTIONS.map((item) => `
+            <label class="check-chip">
+              <input type="checkbox" value="${escapeHtml(item)}" data-negative-option ${wb.negativeOptions?.includes(item) ? "checked" : ""} />
+              <span>${escapeHtml(item)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="simple-category-panel">
+      ${category.groups.map((group) => renderChoiceGroup(group.label, group.key, group.options)).join("")}
+    </div>
+  `;
 }
 
 function renderPromptResultHero() {
@@ -1457,13 +1411,48 @@ function bindWorkbenchEvents() {
     });
   }
 
-  document.getElementById("wbOutputFormat").addEventListener("change", (event) => {
+  const promptTypeSelect = document.getElementById("wbPromptType");
+  if (promptTypeSelect) {
+    promptTypeSelect.addEventListener("change", (event) => {
+      wb.promptType = event.target.value;
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  }
+
+  const outputFormatSelect = document.getElementById("wbOutputFormat");
+  if (outputFormatSelect) outputFormatSelect.addEventListener("change", (event) => {
     wb.outputFormat = event.target.value;
     regenerateResults();
   });
-  document.getElementById("wbTargetTool").addEventListener("change", (event) => {
+  const targetToolSelect = document.getElementById("wbTargetTool");
+  if (targetToolSelect) targetToolSelect.addEventListener("change", (event) => {
     wb.targetTool = event.target.value;
     regenerateResults();
+  });
+
+  const mappedControls = [
+    ["wbAspectRatio", "aspectRatio"],
+    ["wbQuality", "quality"],
+    ["wbMotionLevel", "motionLevel"],
+    ["wbCameraSpeed", "cameraSpeed"],
+    ["wbEmotionIntensity", "emotionIntensity"],
+    ["wbSceneGoal", "sceneGoal"],
+    ["wbActionDetail", "actionDetail"],
+    ["wbCustomNegative", "customNegative"],
+  ];
+  mappedControls.forEach(([id, key]) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("input", (event) => {
+      wb[key] = event.target.value;
+      regenerateResults();
+    });
+    input.addEventListener("change", (event) => {
+      wb[key] = event.target.value;
+      regenerateResults();
+    });
   });
 
   document.querySelectorAll("[data-workbench-field]").forEach((field) => {
@@ -1500,6 +1489,15 @@ function bindWorkbenchEvents() {
     button.addEventListener("click", () => {
       wb[button.dataset.choiceKey] = button.dataset.choiceValue;
       regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
+
+  document.querySelectorAll("[data-generator-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      wb.activeCategory = button.dataset.generatorCategory;
+      saveState();
       renderWorkbench();
       refreshIcons();
     });
@@ -1560,12 +1558,18 @@ function bindWorkbenchEvents() {
   });
   document.getElementById("clearWorkbenchBtn").addEventListener("click", clearWorkbench);
 
-  document.getElementById("applyInsightBtn").addEventListener("click", () => {
-    applyInsightToEditor();
-    regenerateResults();
-    renderWorkbench();
-    showToast("AI拆解方案已写入编辑区");
-  });
+  const applyInsightButton = document.getElementById("applyInsightBtn");
+  if (applyInsightButton) {
+    applyInsightButton.addEventListener("click", () => {
+      applyInsightToEditor();
+      regenerateResults();
+      renderWorkbench();
+      showToast("AI拆解方案已写入编辑区");
+    });
+  }
+
+  const simpleExportButton = document.getElementById("simpleExportBtn");
+  if (simpleExportButton) simpleExportButton.addEventListener("click", exportData);
 
   document.querySelectorAll("[data-optimization]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1594,7 +1598,8 @@ function bindWorkbenchEvents() {
     });
   }
 
-  document.getElementById("resetWorkbenchBtn").addEventListener("click", () => {
+  const resetButton = document.getElementById("resetWorkbenchBtn");
+  if (resetButton) resetButton.addEventListener("click", () => {
     state.workbench = clone(DEFAULT_STATE.workbench);
     regenerateResults();
     saveState();
