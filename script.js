@@ -194,12 +194,12 @@ const OPTIMIZE_ACTIONS = [
 ];
 
 const GENERATOR_CATEGORIES = [
-  { id: "styles", label: "Styles", icon: "image", groups: [{ label: "画面风格", key: "texture", options: TEXTURE_OPTIONS }] },
-  { id: "lighting", label: "Lighting", icon: "lightbulb", groups: [{ label: "光线", key: "lightingControl", options: LIGHTING_OPTIONS }, { label: "氛围", key: "atmosphere", options: ATMOSPHERE_OPTIONS }] },
-  { id: "camera", label: "Camera", icon: "camera", groups: [{ label: "景别", key: "shotSize", options: SHOT_SIZES }, { label: "机位", key: "cameraAngle", options: CAMERA_ANGLES }, { label: "构图", key: "composition", options: COMPOSITIONS }] },
-  { id: "action", label: "Action", icon: "move-3d", groups: [{ label: "站位", key: "blocking", options: BLOCKING_OPTIONS }, { label: "动作", key: "action", options: ACTION_OPTIONS }] },
-  { id: "expression", label: "Expression", icon: "sparkles", groups: [{ label: "角色状态", key: "characterState", options: CHARACTER_STATES }, { label: "眼神", key: "eye", options: EYE_OPTIONS }, { label: "嘴部", key: "mouth", options: MOUTH_OPTIONS }, { label: "呼吸", key: "breath", options: BREATH_OPTIONS }] },
-  { id: "negative", label: "Negative", icon: "shield-x", groups: [] },
+  { id: "styles", label: "风格", icon: "image", groups: [{ label: "画面风格", key: "texture", options: TEXTURE_OPTIONS }] },
+  { id: "lighting", label: "光影", icon: "lightbulb", groups: [{ label: "光线", key: "lightingControl", options: LIGHTING_OPTIONS }, { label: "氛围", key: "atmosphere", options: ATMOSPHERE_OPTIONS }] },
+  { id: "camera", label: "相机", icon: "camera", groups: [{ label: "景别", key: "shotSize", options: SHOT_SIZES }, { label: "机位", key: "cameraAngle", options: CAMERA_ANGLES }, { label: "构图", key: "composition", options: COMPOSITIONS }] },
+  { id: "action", label: "动作", icon: "move-3d", groups: [{ label: "站位", key: "blocking", options: BLOCKING_OPTIONS }, { label: "动作", key: "action", options: ACTION_OPTIONS }] },
+  { id: "expression", label: "微表情", icon: "sparkles", groups: [{ label: "角色状态", key: "characterState", options: CHARACTER_STATES }, { label: "眼神", key: "eye", options: EYE_OPTIONS }, { label: "嘴部", key: "mouth", options: MOUTH_OPTIONS }, { label: "呼吸", key: "breath", options: BREATH_OPTIONS }] },
+  { id: "negative", label: "负面提示词", icon: "shield-x", groups: [] },
 ];
 
 const DEFAULT_STATE = {
@@ -846,35 +846,35 @@ function renderWorkbench() {
     <div class="simple-generator-page">
       ${renderSimpleGeneratorHeader()}
       <section class="simple-generator">
-        <h2>AI ReelShorts Prompt Generator</h2>
-        <textarea id="wbSourceBrief" class="simple-main-input" data-workbench-field="sourceBrief" placeholder="Start typing your main idea...">${escapeHtml(wb.sourceBrief || "")}</textarea>
-        <textarea id="resultText" class="simple-result-input" placeholder="/video prompt:">${escapeHtml(wb.results[state.resultTab] || "")}</textarea>
+        <h2>AI短视频提示词生成器</h2>
+        <textarea id="wbSourceBrief" class="simple-main-input" data-workbench-field="sourceBrief" placeholder="输入你的主要想法、剧情片段或画面需求...">${escapeHtml(wb.sourceBrief || "")}</textarea>
+        <textarea id="resultText" class="simple-result-input" placeholder="/ 提示词结果：">${escapeHtml(wb.results[state.resultTab] || "")}</textarea>
         <div class="simple-action-row">
-          <button class="pf-button pf-blue" type="button" id="copyResultBtn">
+          <button class="pf-button pf-primary" type="button" id="copyResultBtn">
             <i data-lucide="copy"></i>
-            Copy Prompt
+            复制提示词
           </button>
-          <button class="pf-button pf-green" type="button" id="savePresetBtn">
+          <button class="pf-button pf-secondary" type="button" id="savePresetBtn">
             <i data-lucide="save"></i>
-            Save to My Prompts
+            保存到提示词库
           </button>
-          <button class="pf-button pf-red" type="button" id="topOptimizeBtn">
+          <button class="pf-button pf-accent" type="button" id="topOptimizeBtn">
             <i data-lucide="wand-sparkles"></i>
-            Optimize
+            优化提示词
           </button>
         </div>
         <section class="simple-params-card">
           ${renderSimpleParameterGrid(role)}
           ${renderSimpleCategoryTabs()}
           ${renderSimpleCategoryPanel()}
-          <label class="pf-button pf-green upload-button" for="wbReferenceImage">
+          <label class="pf-button pf-secondary upload-button" for="wbReferenceImage">
             <i data-lucide="upload"></i>
-            Upload Inspirational Image
+            上传参考图片
           </label>
           <input id="wbReferenceImage" type="file" accept="image/*" hidden />
           <div class="simple-file-note">${wb.referenceImageName ? `已选择参考图：${escapeHtml(wb.referenceImageName)}` : "可选：上传电影静帧或场景图，辅助判断光影、构图和相机参数。"}</div>
-          <button class="pf-button pf-blue clear-button" type="button" id="clearWorkbenchBtn">
-            Clear All
+          <button class="pf-button pf-primary clear-button" type="button" id="clearWorkbenchBtn">
+            清空全部
           </button>
         </section>
       </section>
@@ -889,7 +889,7 @@ function renderSimpleGeneratorHeader() {
     <header class="simple-generator-header">
       <a class="simple-logo" href="#workbench" aria-label="返回工作台">
         <span class="simple-logo-mark">AP</span>
-        <strong>Prompt<span>Control</span></strong>
+        <strong>提示词<span>控制台</span></strong>
       </a>
       <nav>
         <a href="#roles">角色资产</a>
@@ -897,8 +897,12 @@ function renderSimpleGeneratorHeader() {
         <a href="#presets">提示词库</a>
       </nav>
       <div class="simple-header-actions">
-        <button class="pf-outline" type="button" id="simpleExportBtn">Export</button>
-        <button class="pf-button pf-blue" type="button" id="generatePromptBtn">Generate</button>
+        <button class="pf-outline" type="button" id="simpleThemeBtn">
+          <i data-lucide="${state.theme === "dark" ? "sun" : "moon"}"></i>
+          ${state.theme === "dark" ? "白天模式" : "黑夜模式"}
+        </button>
+        <button class="pf-outline" type="button" id="simpleExportBtn">导出</button>
+        <button class="pf-button pf-primary" type="button" id="generatePromptBtn">生成提示词</button>
       </div>
     </header>
   `;
@@ -909,18 +913,18 @@ function renderSimpleParameterGrid(role) {
   const tools = unique(["通用", ...TARGET_TOOLS, "自定义"]);
   return `
     <div class="simple-param-grid">
-      ${renderSimpleSelect("Prompt Type", "wbPromptType", PROMPT_TYPES, wb.promptType)}
-      ${renderSimpleSelect("Role Asset", "wbRole", ["::不使用角色", ...state.roles.map((item) => `${item.id}::${item.name} / ${item.identity}`)], role ? `${role.id}::${role.name} / ${role.identity}` : "", true)}
-      ${renderSimpleSelect("Target Tool", "wbTargetTool", tools, wb.targetTool)}
-      ${renderSimpleSelect("Aspect Ratio", "wbAspectRatio", PARAMETER_GROUPS[0].options, wb.aspectRatio)}
-      ${renderSimpleSelect("Quality", "wbQuality", PARAMETER_GROUPS[1].options, wb.quality)}
-      ${renderSimpleSelect("Output", "wbOutputFormat", OUTPUT_FORMATS, wb.outputFormat)}
-      ${renderSimpleInput("Motion", "wbMotionLevel", wb.motionLevel || "", "静态 / 轻微 / 中等 / 明显")}
-      ${renderSimpleInput("Camera Speed", "wbCameraSpeed", wb.cameraSpeed || "", "慢 / 中 / 快")}
-      ${renderSimpleInput("Emotion", "wbEmotionIntensity", wb.emotionIntensity || "", "克制 / 中等 / 强烈")}
-      ${renderSimpleInput("Scene Goal", "wbSceneGoal", wb.sceneGoal || "", "例如：夜色窗边强忍愤怒")}
-      ${renderSimpleInput("Action Detail", "wbActionDetail", wb.actionDetail || "", "补充动作细节")}
-      ${renderSimpleInput("Exclude", "wbCustomNegative", wb.customNegative || "", "Avoid these terms in the prompt")}
+      ${renderSimpleSelect("提示词类型", "wbPromptType", PROMPT_TYPES, wb.promptType)}
+      ${renderSimpleSelect("角色资产", "wbRole", ["::不使用角色", ...state.roles.map((item) => `${item.id}::${item.name} / ${item.identity}`)], role ? `${role.id}::${role.name} / ${role.identity}` : "", true)}
+      ${renderSimpleSelect("模型", "wbTargetTool", tools, wb.targetTool)}
+      ${renderSimpleSelect("比例", "wbAspectRatio", PARAMETER_GROUPS[0].options, wb.aspectRatio)}
+      ${renderSimpleSelect("质量", "wbQuality", PARAMETER_GROUPS[1].options, wb.quality)}
+      ${renderSimpleSelect("输出", "wbOutputFormat", OUTPUT_FORMATS, wb.outputFormat)}
+      ${renderSimpleInput("动作幅度", "wbMotionLevel", wb.motionLevel || "", "静态 / 轻微 / 中等 / 明显")}
+      ${renderSimpleInput("镜头控制", "wbCameraSpeed", wb.cameraSpeed || "", "慢 / 中 / 快")}
+      ${renderSimpleInput("情绪", "wbEmotionIntensity", wb.emotionIntensity || "", "克制 / 中等 / 强烈")}
+      ${renderSimpleInput("光影", "wbSceneGoal", wb.sceneGoal || "", "例如：夜色窗边强忍愤怒")}
+      ${renderSimpleInput("动作细节", "wbActionDetail", wb.actionDetail || "", "补充动作细节")}
+      ${renderSimpleInput("负面提示词", "wbCustomNegative", wb.customNegative || "", "避免出现的画面问题或跑偏内容")}
     </div>
   `;
 }
@@ -1570,6 +1574,17 @@ function bindWorkbenchEvents() {
 
   const simpleExportButton = document.getElementById("simpleExportBtn");
   if (simpleExportButton) simpleExportButton.addEventListener("click", exportData);
+
+  const simpleThemeButton = document.getElementById("simpleThemeBtn");
+  if (simpleThemeButton) {
+    simpleThemeButton.addEventListener("click", () => {
+      state.theme = state.theme === "dark" ? "light" : "dark";
+      document.body.classList.toggle("dark", state.theme === "dark");
+      saveState();
+      renderWorkbench();
+      refreshIcons();
+    });
+  }
 
   document.querySelectorAll("[data-optimization]").forEach((button) => {
     button.addEventListener("click", () => {
