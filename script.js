@@ -3,7 +3,7 @@ const STORAGE_KEY = "ai_reelshorts_prompt_control_v1";
 const NAV_ITEMS = [
   { id: "workbench", label: "工作台", icon: "wand-sparkles", title: "提示词创建工作台" },
   { id: "roles", label: "角色资产", icon: "user-round-cog", title: "角色资产库" },
-  { id: "modules", label: "模块库", icon: "blocks", title: "提示词模块库" },
+  { id: "modules", label: "存储库", icon: "database", title: "提示词存储库" },
   { id: "presets", label: "预设库", icon: "library", title: "预设提示词库" },
   { id: "tags", label: "分类标签", icon: "tags", title: "分类与标签管理" },
   { id: "models", label: "模型配置", icon: "cpu", title: "模型配置" },
@@ -254,7 +254,7 @@ const DEFAULT_STATE = {
       scene: "module-scene-window",
       camera: "module-camera-close",
       action: "module-action-controlled",
-      expression: "module-expression-anger",
+      expression: "module-expression-principle",
       lighting: "module-light-window",
       texture: "module-texture-film",
       style: "module-style-reelshort",
@@ -275,6 +275,10 @@ const DEFAULT_STATE = {
     "男主",
     "ReelShort",
     "电影感",
+    "存储库",
+    "微表情资产",
+    "情绪拆解",
+    "表演控制",
     "逆光",
     "近景",
     "愤怒",
@@ -417,6 +421,84 @@ const DEFAULT_STATE = {
       uses: 18,
       notes: "眼尾发红强度要低。",
       updatedAt: "2026-06-20",
+    },
+    {
+      id: "module-expression-principle",
+      name: "微表情拆解总纲",
+      type: "expression",
+      zh: "生成微表情时不要只写一个情绪词，必须拆成：情绪根因、情绪强度、眼神焦点、眉部压力、嘴部控制、呼吸节奏、下颌/肩颈张力、停顿时长、动作延迟和禁止项。输出应保持真人电影表演逻辑，以细微、克制、可被镜头捕捉的变化为主，避免夸张哭笑、五官大幅变形和舞台剧式表演。",
+      en: "When generating micro-expressions, do not use a single emotion word. Break it down into emotional cause, intensity, eye focus, brow tension, mouth control, breathing rhythm, jaw/neck/shoulder tension, pause duration, delayed action, and constraints. Keep the performance grounded in live-action cinematic acting: subtle, restrained, camera-readable changes, avoiding exaggerated crying, laughing, facial distortion, or theatrical acting.",
+      tags: ["微表情资产", "情绪拆解", "表演控制", "存储库"],
+      scenarios: "所有人物近景、情绪戏、对话冲突、视频提示词生成",
+      favorite: true,
+      uses: 1,
+      notes: "作为微表情类型的总纲词条，每次调用AI时优先参考，再叠加具体情绪词条。",
+      updatedAt: "2026-06-21",
+    },
+    {
+      id: "module-expression-grievance-restrained",
+      name: "委屈但不失控的微表情",
+      type: "expression",
+      zh: "眼眶轻微湿润，视线短暂下沉后又强行抬起，眉心有极轻的收缩，嘴角向下压但不颤哭，喉结/下颌有吞咽感，呼吸变浅，整体像是在把委屈压回去，不要嚎哭或泪流满面。",
+      en: "Eyes slightly moist, gaze briefly drops then forces itself back up, a faint contraction between the brows, mouth corners pressed downward without sobbing, a swallowed tension in the throat or jaw, shallow breathing, as if pushing grievance back down; no wailing or streaming tears.",
+      tags: ["委屈", "克制", "眼眶湿润", "微表情资产"],
+      scenarios: "误会、被质问、亲密关系受伤、真相前奏",
+      favorite: true,
+      uses: 1,
+      notes: "重点是湿润感和吞咽感，不要变成大哭戏。",
+      updatedAt: "2026-06-21",
+    },
+    {
+      id: "module-expression-shock-freeze",
+      name: "震惊后的短暂停滞",
+      type: "expression",
+      zh: "瞳孔和眼神出现短暂停滞，眨眼频率降低，眉毛轻微上提后迅速压住，嘴唇微张但没有夸张张大，呼吸停半拍，肩颈僵住一瞬，随后情绪被角色强行收回。",
+      en: "A brief frozen look in the eyes, reduced blinking, brows lift slightly then are quickly controlled, lips part subtly without a wide-open mouth, breath pauses for half a beat, neck and shoulders stiffen for an instant, then the emotion is forced back under control.",
+      tags: ["震惊", "停顿", "克制", "微表情资产"],
+      scenarios: "发现真相、反转、被背叛、听到关键线索",
+      favorite: true,
+      uses: 1,
+      notes: "用于反转瞬间，核心是半拍停滞和迅速压回情绪。",
+      updatedAt: "2026-06-21",
+    },
+    {
+      id: "module-expression-suspicion-probing",
+      name: "怀疑试探的微表情",
+      type: "expression",
+      zh: "眼神先停在对方脸上再轻微偏移，眉尾有细小收紧，嘴角几乎不动，只保留一点审视感，呼吸平稳但语气前有短暂停顿，下颌微收，整体呈现克制的怀疑和试探。",
+      en: "The gaze holds on the other person's face, then shifts slightly away; the tail of the brow tightens subtly, mouth corners barely move with a trace of scrutiny, breathing remains steady with a short pause before speaking, jaw slightly tucked, conveying restrained suspicion and probing.",
+      tags: ["怀疑", "试探", "对峙", "微表情资产"],
+      scenarios: "对话试探、审问、权力博弈、隐藏真相",
+      favorite: true,
+      uses: 1,
+      notes: "适合高级对话戏，避免翻白眼、挑眉过度。",
+      updatedAt: "2026-06-21",
+    },
+    {
+      id: "module-expression-cold-withheld",
+      name: "冷漠疏离的微表情",
+      type: "expression",
+      zh: "眼神稳定但不贴近对方，面部肌肉放松到近乎无表情，嘴唇保持自然闭合，下颌线清晰，眨眼节奏慢，呼吸平稳，情绪被完全收在表层之下，呈现礼貌、疏离、不可接近的冷感。",
+      en: "Steady eyes that do not emotionally reach the other person, facial muscles relaxed into an almost neutral expression, lips naturally closed, clear jawline, slow blinking, steady breathing, emotion held entirely beneath the surface, polite, distant, and unreachable.",
+      tags: ["冷漠", "疏离", "克制", "微表情资产"],
+      scenarios: "分手、权力压制、职场对峙、关系破裂",
+      favorite: true,
+      uses: 1,
+      notes: "冷感来自疏离和静止，不是僵硬面瘫。",
+      updatedAt: "2026-06-21",
+    },
+    {
+      id: "module-expression-collapse-contained",
+      name: "崩溃边缘但强行维持",
+      type: "expression",
+      zh: "眼神短暂失焦后重新聚焦，呼吸开始不稳但被压低，嘴唇轻颤一次后紧抿，下颌微微发紧，肩膀有极小幅度下沉，人物像快要崩溃但仍强行保持体面，不要夸张哭喊。",
+      en: "The eyes briefly lose focus then refocus, breathing becomes unstable but is pushed down, lips tremble once then press tight, jaw tightens subtly, shoulders sink by a tiny degree, as if the character is near collapse while still forcing composure; no exaggerated crying or shouting.",
+      tags: ["崩溃", "强忍", "内心戏", "微表情资产"],
+      scenarios: "情绪临界点、真相揭露后、失去重要关系、复仇失败",
+      favorite: true,
+      uses: 1,
+      notes: "用于强戏剧张力，建议搭配近景或特写。",
+      updatedAt: "2026-06-21",
     },
     {
       id: "module-light-window",
@@ -621,7 +703,7 @@ const DEFAULT_STATE = {
       id: "model-local",
       name: "本地组合器",
       type: "文本",
-      usage: "不调用API，按照已选资产和模块自动组合提示词",
+      usage: "不调用API，按照已选资产和存储词条自动组合提示词",
       language: "中英双语",
       enabled: true,
       priority: 1,
@@ -893,7 +975,7 @@ function renderSimpleGeneratorHeader() {
       </a>
       <nav>
         <a href="#roles">角色资产</a>
-        <a href="#modules">模块库</a>
+        <a href="#modules">存储库</a>
         <a href="#presets">提示词库</a>
       </nav>
       <div class="simple-header-actions">
@@ -1198,9 +1280,9 @@ function renderInsightPackage(role) {
           body: `当前输入的核心不是单纯执行「${brief}」，而是判断这一镜头最需要控制的情绪临界点、人物关系和画面节奏。${role ? `${roleName} 的固定气质是「${role.temperament}」，因此方案应优先保留角色克制感和一致性。` : "如果选择角色资产，系统会把角色固定项、可变项和禁止项一起纳入判断。"}`,
         },
         {
-          title: "可拆解模块",
+          title: "可拆解结构",
           tone: "拆解",
-          body: "视频提示词会拆成场景空间、光影与相机参数、人物行为逻辑、动作节奏、微表情、镜头运动、画面质感和负面约束。每个模块后续都应该给出多个可选方案，并允许用户锁定或改写。",
+          body: "视频提示词会拆成场景空间、光影与相机参数、人物行为逻辑、动作节奏、微表情、镜头运动、画面质感和负面约束。每个结构项后续都应该给出多个可选方案，并允许用户锁定或改写。",
         },
         {
           title: "当前子任务重点",
@@ -1210,7 +1292,7 @@ function renderInsightPackage(role) {
         {
           title: "组合策略",
           tone: "输出",
-          body: "最终结果不应只是拼接词条，而要把 AI 判断、参考图识别、角色资产和模块选择合成可直接投喂视频模型的完整提示词，并保留中文、英文、负面提示词和结构化 JSON。",
+          body: "最终结果不应只是拼接词条，而要把 AI 判断、参考图识别、角色资产和存储词条合成可直接投喂视频模型的完整提示词，并保留中文、英文、负面提示词和结构化 JSON。",
         },
       ]
     : [
@@ -1220,9 +1302,9 @@ function renderInsightPackage(role) {
           body: `当前输入会被理解为一张高质量静帧需求：先确定主体、构图、场景、光影、镜头焦段、画面质感和目标工具，再判断哪些元素必须固定，哪些可以变化。${role ? `${roleName} 的外观固定项会作为角色一致性锚点。` : ""}`,
         },
         {
-          title: "可拆解模块",
+          title: "可拆解结构",
           tone: "拆解",
-          body: "图片提示词会拆成主体与角色、场景空间、构图景别、光影色调、相机参数、画面质感、风格参考和负面约束。后续可对每个模块给出多个专业方案。",
+          body: "图片提示词会拆成主体与角色、场景空间、构图景别、光影色调、相机参数、画面质感、风格参考和负面约束。后续可对每个结构项给出多个专业方案。",
         },
         {
           title: "当前子任务重点",
@@ -1232,7 +1314,7 @@ function renderInsightPackage(role) {
         {
           title: "组合策略",
           tone: "输出",
-          body: "最终结果应同时适合直接生成和继续精修：既有完整提示词，也保留可锁定的模块化结构，便于复用到角色定妆、场景概念和光影资产库。",
+          body: "最终结果应同时适合直接生成和继续精修：既有完整提示词，也保留可锁定的结构化词条，便于复用到角色定妆、场景概念和光影资产库。",
         },
       ];
 
@@ -1643,7 +1725,7 @@ function applyQuickOptimize(id) {
 }
 
 function clearWorkbench() {
-  const ok = confirm("确认清空当前工作台内容吗？角色资产和模块库不会被删除。");
+  const ok = confirm("确认清空当前工作台内容吗？角色资产和存储库不会被删除。");
   if (!ok) return;
   state.workbench = {
     ...clone(DEFAULT_STATE.workbench),
@@ -1675,7 +1757,7 @@ function applyInsightToEditor() {
     : `请基于输入内容拆解图片画面：先判断主体、场景、构图和视觉焦点，再输出光影色调、相机参数、画面质感、风格参考和负面约束。${role ? `角色资产优先保持 ${role.name} 的外观一致性。` : ""}`;
   wb.extra = [
     wb.referenceImageName ? `参考图：${wb.referenceImageName}` : "暂无参考图；如上传图片，需要识别空间、光源、色彩、镜头和人物站位。",
-    wb.referenceNote || "输出必须体现专业判断，不要只给简单标签；每个模块后续都应支持多方案选择、锁定和修改。",
+    wb.referenceNote || "输出必须体现专业判断，不要只给简单标签；每个结构项后续都应支持多方案选择、锁定和修改。",
   ].join("\n");
 }
 
@@ -1746,12 +1828,16 @@ function composePrompt() {
     .map((item) => `[${item.type.label}] ${item.en || item.zh}`)
     .join("\n");
 
+  const repositoryReferenceModules = getRepositoryReferenceModules(selectedModules, wb.promptType, task);
+  const repositoryZh = renderRepositoryReference(repositoryReferenceModules, "zh");
+  const repositoryEn = renderRepositoryReference(repositoryReferenceModules, "en");
+
   const negativeModule = selectedModules.find((item) => item.type.id === "negative");
   const negative = [
     role?.forbidden ? `角色禁止项：${lineToSentence(role.forbidden)}` : "",
     ...(wb.negativeOptions || []),
     wb.customNegative ? `自定义禁止项：${wb.customNegative}` : "",
-    negativeModule ? `模块负面约束：${negativeModule.zh}` : "",
+    negativeModule ? `存储库负面约束：${negativeModule.zh}` : "",
     "不要出现肢体扭曲、面部崩坏、五官漂移、手指错误、镜头脏污、低清晰度、廉价塑料质感。",
   ].filter(Boolean).join("\n");
 
@@ -1817,8 +1903,11 @@ function composePrompt() {
     "【基础参数】",
     parameterLines.join("\n"),
     "",
-    "【关键控制模块】",
-    moduleZh || "未选择模块。",
+    "【关键存储词条】",
+    moduleZh || "未选择存储词条。",
+    "",
+    "【存储库参考原则】",
+    repositoryZh,
     "",
     "【快捷优化方向】",
     optimizationZh.length ? optimizationZh.join("\n") : "无。",
@@ -1862,8 +1951,11 @@ function composePrompt() {
     "[Parameters]",
     parameterLines.join("\n"),
     "",
-    "[Control Modules]",
-    moduleEn || "No module selected.",
+    "[Storage Entries]",
+    moduleEn || "No storage entry selected.",
+    "",
+    "[Storage Repository Reference]",
+    repositoryEn,
     "",
     "[Optimization Direction]",
     optimizationEn.length ? optimizationEn.join("\n") : "None.",
@@ -1923,6 +2015,13 @@ function composePrompt() {
         en: item.en,
         tags: item.module.tags,
       })),
+      repositoryReferences: repositoryReferenceModules.map((item) => ({
+        type: MODULE_TYPES.find((type) => type.id === item.type)?.label || item.type,
+        name: item.name,
+        zh: item.zh,
+        en: item.en,
+        tags: item.tags,
+      })),
       optimizationNotes: wb.optimizationNotes || [],
       negativePrompt: negative,
       extra: wb.extra,
@@ -1932,6 +2031,42 @@ function composePrompt() {
   );
 
   return { zh, en, negative, json };
+}
+
+function getRepositoryReferenceModules(selectedModules, promptType, task) {
+  const selectedIds = new Set(selectedModules.map((item) => item.module.id));
+  const shouldUseExpression = [promptType, task, state.workbench.activeCategory]
+    .filter(Boolean)
+    .some((item) => String(item).includes("微表情") || String(item).includes("画面") || String(item).includes("视频"));
+  const expressionReferences = shouldUseExpression
+    ? state.modules.filter((item) => item.type === "expression" && (item.favorite || selectedIds.has(item.id)))
+    : [];
+  const explicitReferences = selectedModules.map((item) => item.module);
+  const orderedReferences = shouldUseExpression
+    ? [...expressionReferences, ...explicitReferences]
+    : explicitReferences;
+  return uniqueById(orderedReferences).slice(0, 12);
+}
+
+function renderRepositoryReference(modules, language = "zh") {
+  const fixedRule = language === "zh"
+    ? "调用AI时优先参考存储库：角色固定项和禁止项优先级最高；微表情按情绪根因、强度、眼神、眉部、嘴部、呼吸、下颌/肩颈、停顿和动作延迟拆解；输出要细腻、可拍、可控，避免模板化情绪词。"
+    : "When calling AI, prioritize the storage repository: character fixed traits and forbidden constraints have the highest priority; micro-expressions must be broken down by emotional cause, intensity, eyes, brows, mouth, breath, jaw/neck/shoulders, pause, and delayed action; keep the output subtle, filmable, controllable, and avoid generic emotion words.";
+  const lines = modules.map((item) => {
+    const typeLabel = MODULE_TYPES.find((type) => type.id === item.type)?.label || item.type;
+    const content = language === "zh" ? item.zh : item.en || item.zh;
+    return `${language === "zh" ? "参考词条" : "Reference"}【${typeLabel} / ${item.name}】${content}`;
+  });
+  return [fixedRule, ...lines].join("\n");
+}
+
+function uniqueById(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (!item?.id || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 }
 
 function renderRoles() {
@@ -1976,13 +2111,13 @@ function renderModules() {
   const quickTypes = getModuleQuickTypes();
   const modules = getFilteredModules();
   dom.view.innerHTML = `
-    ${renderToolbar("提示词模块库", "保存可反复组合的小积木：光影、镜头、动作、微表情、质感与负面约束。", "新建模块", "module")}
+    ${renderToolbar("提示词存储库", "保存AI生成时可参考的专业词条：光影、镜头、动作、微表情、质感与负面约束。", "新建词条", "module")}
     <div class="module-filter-bar">
       <label class="module-search-field" for="moduleSearchInput">
         <i data-lucide="search"></i>
-        <input id="moduleSearchInput" type="search" placeholder="搜索模块名称、中文内容、标签" value="${escapeHtml(moduleSearch)}" />
+        <input id="moduleSearchInput" type="search" placeholder="搜索词条名称、中文内容、标签" value="${escapeHtml(moduleSearch)}" />
       </label>
-      <div class="quick-type-strip" aria-label="常用模块类型">
+      <div class="quick-type-strip" aria-label="常用存储类型">
         <button class="quick-type ${filterType === "all" ? "is-selected" : ""}" type="button" data-module-type-chip="all">全部</button>
         ${quickTypes.map((type) => `
           <button class="quick-type ${filterType === type.id ? "is-selected" : ""}" type="button" data-module-type-chip="${type.id}">
@@ -1990,7 +2125,7 @@ function renderModules() {
           </button>
         `).join("")}
       </div>
-      <button class="icon-button module-quick-settings" id="moduleQuickSettingsBtn" type="button" aria-label="设置常用模块类型">
+      <button class="icon-button module-quick-settings" id="moduleQuickSettingsBtn" type="button" aria-label="设置常用存储类型">
         <i data-lucide="settings"></i>
       </button>
     </div>
@@ -2037,7 +2172,7 @@ function renderModuleResults(modules) {
       <table>
         <thead>
           <tr>
-            <th>模块</th>
+            <th>词条</th>
             <th>类型</th>
             <th>中文内容</th>
             <th>标签</th>
@@ -2048,7 +2183,7 @@ function renderModuleResults(modules) {
         <tbody>${modules.map(renderModuleRow).join("")}</tbody>
       </table>
     </div>`
-    : emptyState("还没有匹配的模块", "换一个关键词，或通过右侧齿轮添加更多常用类型。");
+    : emptyState("还没有匹配的存储词条", "换一个关键词，或通过右侧齿轮添加更多常用类型。");
 }
 
 function getModuleQuickTypes() {
@@ -2126,13 +2261,13 @@ function renderTags() {
   const query = currentQuery();
   const tags = state.tags.filter((tag) => tag.toLowerCase().includes(query));
   dom.view.innerHTML = `
-    ${renderToolbar("分类与标签管理", "用标签把角色、模块和完整提示词串起来，方便长期搜索复用。", "新建标签", "tag")}
+    ${renderToolbar("分类与标签管理", "用标签把角色、存储词条和完整提示词串起来，方便长期搜索复用。", "新建标签", "tag")}
     <div class="tag-manager">
       <section class="panel">
         <div class="panel-head">
           <div>
             <h2>标签云</h2>
-            <p>删除标签会同步从角色、模块和预设中移除。</p>
+            <p>删除标签会同步从角色、存储词条和预设中移除。</p>
           </div>
         </div>
         <div class="panel-body">
@@ -2249,7 +2384,7 @@ function bindAssetEvents() {
   dom.view.querySelectorAll("[data-delete-role]").forEach((button) => button.addEventListener("click", () => deleteEntity("roles", button.dataset.deleteRole, "角色")));
 
   dom.view.querySelectorAll("[data-edit-module]").forEach((button) => button.addEventListener("click", () => openModuleModal(getModule(button.dataset.editModule))));
-  dom.view.querySelectorAll("[data-delete-module]").forEach((button) => button.addEventListener("click", () => deleteEntity("modules", button.dataset.deleteModule, "模块")));
+  dom.view.querySelectorAll("[data-delete-module]").forEach((button) => button.addEventListener("click", () => deleteEntity("modules", button.dataset.deleteModule, "词条")));
 
   dom.view.querySelectorAll("[data-use-preset]").forEach((button) => button.addEventListener("click", () => usePreset(button.dataset.usePreset)));
   dom.view.querySelectorAll("[data-copy-preset]").forEach((button) => button.addEventListener("click", () => {
@@ -2334,16 +2469,16 @@ function openRoleModal(role = null) {
 function openModuleModal(module = null) {
   modalMode = "module";
   modalEditingId = module?.id || null;
-  dom.modalEyebrow.textContent = "提示词模块";
-  dom.modalTitle.textContent = module ? `编辑 ${module.name}` : "新建模块";
+  dom.modalEyebrow.textContent = "提示词存储词条";
+  dom.modalTitle.textContent = module ? `编辑 ${module.name}` : "新建词条";
   const item = module || {};
   dom.modalBody.innerHTML = `
     <section class="form-section">
-      <h3>模块信息</h3>
+      <h3>词条信息</h3>
       <div class="field-grid two-col">
-        ${inputField("name", "模块名称", item.name)}
+        ${inputField("name", "词条名称", item.name)}
         <div class="field">
-          <label for="field-type">模块类型</label>
+          <label for="field-type">词条类型</label>
           <select name="type" id="field-type">${MODULE_TYPES.map((type) => `<option value="${type.id}" ${type.id === item.type ? "selected" : ""}>${type.label}</option>`).join("")}</select>
         </div>
       </div>
@@ -2373,13 +2508,13 @@ function openModuleModal(module = null) {
 function openModuleQuickTypeModal() {
   modalMode = "moduleQuickTypes";
   modalEditingId = null;
-  dom.modalEyebrow.textContent = "模块库筛选";
+  dom.modalEyebrow.textContent = "存储库筛选";
   dom.modalTitle.textContent = "设置常用类型";
   const selectedIds = new Set(state.preferences?.moduleQuickTypeIds || DEFAULT_MODULE_QUICK_TYPES);
   dom.modalBody.innerHTML = `
     <section class="form-section">
       <h3>常用快捷框</h3>
-      <p class="hint">勾选后会显示在模块库搜索栏旁边，方便直接点击筛选。</p>
+      <p class="hint">勾选后会显示在存储库搜索栏旁边，方便直接点击筛选。</p>
       <div class="checkbox-grid">
         ${MODULE_TYPES.map((type) => `
           <label class="checkbox-row">
@@ -2440,7 +2575,7 @@ function openTagModal() {
   dom.modalBody.innerHTML = `
     <section class="form-section">
       ${inputField("tag", "标签名称")}
-      <p class="hint">标签会用于角色、模块和完整提示词搜索。</p>
+      <p class="hint">标签会用于角色、存储词条和完整提示词搜索。</p>
     </section>
   `;
   openModal();
