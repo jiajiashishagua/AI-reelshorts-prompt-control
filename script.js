@@ -209,6 +209,7 @@ const DEFAULT_STATE = {
   preferences: {
     moduleQuickTypeIds: DEFAULT_MODULE_QUICK_TYPES,
   },
+  activeProjectId: "project-default-cinematic",
   workbench: {
     mode: "video",
     imageTask: "完整图片提示词",
@@ -270,6 +271,22 @@ const DEFAULT_STATE = {
     },
     lastSavedPresetId: "",
   },
+  projects: [
+    {
+      id: "project-default-cinematic",
+      name: "默认高级短剧风格",
+      visualTone: "写实真人电影感，高级短剧质感，克制、真实、低网感。",
+      colorLogic: "低饱和黑白灰紫基调，保留冷暖对比；肤色真实，不偏塑料感。",
+      lightingPreference: "偏好窗边光、侧逆光、柔和电影光、高对比但暗部细节完整。",
+      lensLanguage: "以近景、过肩拍、稳定轻推镜头为主，突出人物眼神、手部和肩颈细节。",
+      characterTexture: "真实皮肤纹理、自然妆容、不过度磨皮，人物五官稳定。",
+      filmGrain: "细腻胶片颗粒，8K写实剧照质感，避免CGI和渲染感。",
+      defaultNegative: "不要廉价网感，不要塑料皮肤，不要过度柔焦，不要五官漂移，不要夸张表情，不要低清晰度。",
+      defaultModel: "可灵",
+      defaultAspectRatio: "9:16",
+      updatedAt: "2026-06-24",
+    },
+  ],
   tags: [
     "女主",
     "男主",
@@ -876,9 +893,14 @@ function loadState() {
 
 function mergeState(base, saved) {
   const savedWorkbench = saved.workbench || {};
+  const projects = mergeById(base.projects, saved.projects);
+  const activeProjectId = projects.some((item) => item.id === saved.activeProjectId)
+    ? saved.activeProjectId
+    : base.activeProjectId;
   return {
     ...base,
     ...saved,
+    activeProjectId,
     preferences: { ...base.preferences, ...(saved.preferences || {}) },
     workbench: {
       ...base.workbench,
@@ -894,6 +916,7 @@ function mergeState(base, saved) {
     presets: mergeById(base.presets, saved.presets),
     tags: unique([...(Array.isArray(saved.tags) ? saved.tags : []), ...base.tags]),
     models: mergeById(base.models, saved.models),
+    projects,
   };
 }
 
@@ -922,6 +945,16 @@ function getWorkbenchMode() {
 
 function getWorkbenchTask() {
   return state.workbench.mode === "image" ? state.workbench.imageTask : state.workbench.videoTask;
+}
+
+function getActiveProject() {
+  return state.projects.find((item) => item.id === state.activeProjectId) || state.projects[0] || null;
+}
+
+function applyProjectDefaults(project) {
+  if (!project) return;
+  if (project.defaultModel) state.workbench.targetTool = project.defaultModel;
+  if (project.defaultAspectRatio) state.workbench.aspectRatio = project.defaultAspectRatio;
 }
 
 function syncPromptTypeWithMode() {
@@ -994,6 +1027,7 @@ function renderWorkbench() {
   ensureWorkbenchResults();
   const wb = state.workbench;
   const role = getRole(wb.roleId);
+  const project = getActiveProject();
 
   dom.view.innerHTML = `
     <div class="simple-generator-page">
@@ -1017,6 +1051,7 @@ function renderWorkbench() {
           </button>
         </div>
         <section class="simple-params-card">
+          ${renderProjectStyleBar(project)}
           ${renderSimpleParameterGrid(role)}
           ${renderSimpleCategoryTabs()}
           ${renderSimpleCategoryPanel()}
@@ -1079,6 +1114,38 @@ function renderSimpleParameterGrid(role) {
       ${renderSimpleInput("动作细节", "wbActionDetail", wb.actionDetail || "", "补充动作细节")}
       ${renderSimpleInput("负面提示词", "wbCustomNegative", wb.customNegative || "", "避免出现的画面问题或跑偏内容")}
     </div>
+  `;
+}
+
+function renderProjectStyleBar(project) {
+  const current = project || state.projects[0];
+  return `
+    <section class="project-style-bar" aria-label="当前项目风格母版">
+      <div class="project-style-main">
+        <label class="simple-control project-select-control" for="wbProject">
+          <span><i data-lucide="folder-kanban"></i>当前项目</span>
+          <select id="wbProject">
+            ${state.projects.map((item) => `<option value="${item.id}" ${item.id === current?.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+          </select>
+        </label>
+        <div class="project-style-summary">
+          <strong>${escapeHtml(current?.name || "未选择项目")}</strong>
+          <span>${escapeHtml(current?.visualTone || "暂无画面基调")}</span>
+          <small>${escapeHtml([current?.colorLogic, current?.lightingPreference].filter(Boolean).join(" / "))}</small>
+        </div>
+      </div>
+      <div class="project-style-actions">
+        <button class="pf-outline compact-project-button" type="button" id="newProjectBtn">
+          <i data-lucide="plus"></i>新建母版
+        </button>
+        <button class="pf-outline compact-project-button" type="button" id="editProjectBtn" ${current ? "" : "disabled"}>
+          <i data-lucide="pencil"></i>编辑
+        </button>
+        <button class="pf-outline compact-project-button danger-lite" type="button" id="deleteProjectBtn" ${state.projects.length > 1 && current ? "" : "disabled"}>
+          <i data-lucide="trash-2"></i>删除
+        </button>
+      </div>
+    </section>
   `;
 }
 
@@ -1524,6 +1591,27 @@ function renderRoleSnapshot(role) {
 function bindWorkbenchEvents() {
   const wb = state.workbench;
 
+  const projectSelect = document.getElementById("wbProject");
+  if (projectSelect) {
+    projectSelect.addEventListener("change", (event) => {
+      state.activeProjectId = event.target.value;
+      applyProjectDefaults(getActiveProject());
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+      showToast("已切换项目风格母版");
+    });
+  }
+
+  const newProjectButton = document.getElementById("newProjectBtn");
+  if (newProjectButton) newProjectButton.addEventListener("click", () => openProjectModal());
+
+  const editProjectButton = document.getElementById("editProjectBtn");
+  if (editProjectButton) editProjectButton.addEventListener("click", () => openProjectModal(getActiveProject()));
+
+  const deleteProjectButton = document.getElementById("deleteProjectBtn");
+  if (deleteProjectButton) deleteProjectButton.addEventListener("click", deleteActiveProject);
+
   document.querySelectorAll("[data-workbench-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       wb.mode = button.dataset.workbenchMode;
@@ -1848,6 +1936,7 @@ function regenerateResults() {
 function composePrompt() {
   const wb = state.workbench;
   const role = getRole(wb.roleId);
+  const project = getActiveProject();
   const mode = getWorkbenchMode();
   const task = getWorkbenchTask();
   const guidance = wb.mode === "video" ? getVideoTaskGuidance(task) : getImageTaskGuidance(task);
@@ -1902,9 +1991,12 @@ function composePrompt() {
   const repositoryReferenceModules = getRepositoryReferenceModules(selectedModules, wb.promptType, task);
   const repositoryZh = renderRepositoryReference(repositoryReferenceModules, "zh");
   const repositoryEn = renderRepositoryReference(repositoryReferenceModules, "en");
+  const projectZh = renderProjectStyleMaster(project, "zh");
+  const projectEn = renderProjectStyleMaster(project, "en");
 
   const negativeModule = selectedModules.find((item) => item.type.id === "negative");
   const negative = [
+    project?.defaultNegative ? `项目默认负面提示词：${project.defaultNegative}` : "",
     role?.forbidden ? `角色禁止项：${lineToSentence(role.forbidden)}` : "",
     ...(wb.negativeOptions || []),
     wb.customNegative ? `自定义禁止项：${wb.customNegative}` : "",
@@ -1959,6 +2051,9 @@ function composePrompt() {
     "【AI专业判断】",
     guidance,
     "",
+    "【项目风格母版】",
+    projectZh,
+    "",
     "【角色资产】",
     roleZh,
     "",
@@ -2007,6 +2102,9 @@ function composePrompt() {
     "[AI Professional Judgment]",
     guidance,
     "",
+    "[Project Style Master]",
+    projectEn,
+    "",
     "[Character Asset]",
     roleEn,
     "",
@@ -2051,6 +2149,19 @@ function composePrompt() {
       referenceImageName: wb.referenceImageName,
       referenceNote: wb.referenceNote,
       professionalGuidance: guidance,
+      projectStyleMaster: project ? {
+        id: project.id,
+        name: project.name,
+        visualTone: project.visualTone,
+        colorLogic: project.colorLogic,
+        lightingPreference: project.lightingPreference,
+        lensLanguage: project.lensLanguage,
+        characterTexture: project.characterTexture,
+        filmGrain: project.filmGrain,
+        defaultNegative: project.defaultNegative,
+        defaultModel: project.defaultModel,
+        defaultAspectRatio: project.defaultAspectRatio,
+      } : null,
       role: role ? { id: role.id, name: role.name, fixed: lines(role.fixed), variable: lines(role.variable), forbidden: lines(role.forbidden) } : null,
       sceneGoal: wb.sceneGoal,
       frameDescription: wb.frameDescription,
@@ -2102,6 +2213,49 @@ function composePrompt() {
   );
 
   return { zh, en, negative, json };
+}
+
+function renderProjectStyleMaster(project, language = "zh") {
+  if (!project) {
+    return language === "zh" ? "未选择项目风格母版。" : "No project style master selected.";
+  }
+  const labels = language === "zh"
+    ? {
+        name: "项目名称",
+        visualTone: "画面基调",
+        colorLogic: "色彩逻辑",
+        lightingPreference: "光影偏好",
+        lensLanguage: "镜头语言",
+        characterTexture: "人物质感",
+        filmGrain: "胶片颗粒",
+        defaultNegative: "默认负面提示词",
+        defaultModel: "默认模型",
+        defaultAspectRatio: "默认比例",
+      }
+    : {
+        name: "Project",
+        visualTone: "Visual tone",
+        colorLogic: "Color logic",
+        lightingPreference: "Lighting preference",
+        lensLanguage: "Lens language",
+        characterTexture: "Character texture",
+        filmGrain: "Film grain",
+        defaultNegative: "Default negative prompt",
+        defaultModel: "Default model",
+        defaultAspectRatio: "Default aspect ratio",
+      };
+  return [
+    `${labels.name}：${project.name || "未命名项目"}`,
+    `${labels.visualTone}：${project.visualTone || "未设置"}`,
+    `${labels.colorLogic}：${project.colorLogic || "未设置"}`,
+    `${labels.lightingPreference}：${project.lightingPreference || "未设置"}`,
+    `${labels.lensLanguage}：${project.lensLanguage || "未设置"}`,
+    `${labels.characterTexture}：${project.characterTexture || "未设置"}`,
+    `${labels.filmGrain}：${project.filmGrain || "未设置"}`,
+    `${labels.defaultNegative}：${project.defaultNegative || "未设置"}`,
+    `${labels.defaultModel}：${project.defaultModel || "未设置"}`,
+    `${labels.defaultAspectRatio}：${project.defaultAspectRatio || "未设置"}`,
+  ].join("\n");
 }
 
 function getRepositoryReferenceModules(selectedModules, promptType, task) {
@@ -2690,6 +2844,37 @@ function openModelModal(model = null) {
   openModal();
 }
 
+function openProjectModal(project = null) {
+  modalMode = "project";
+  modalEditingId = project?.id || null;
+  dom.modalEyebrow.textContent = "项目风格母版";
+  dom.modalTitle.textContent = project ? `编辑 ${project.name}` : "新建项目风格母版";
+  const item = project || {};
+  dom.modalBody.innerHTML = `
+    <section class="form-section">
+      <h3>基础信息</h3>
+      <div class="field-grid three-col">
+        ${inputField("name", "项目名称", item.name || "")}
+        ${inputField("defaultModel", "默认模型", item.defaultModel || state.workbench.targetTool || "可灵")}
+        ${inputField("defaultAspectRatio", "默认比例", item.defaultAspectRatio || state.workbench.aspectRatio || "9:16")}
+      </div>
+    </section>
+    <section class="form-section">
+      <h3>风格控制</h3>
+      ${textareaField("visualTone", "画面基调", item.visualTone || "")}
+      ${textareaField("colorLogic", "色彩逻辑", item.colorLogic || "")}
+      ${textareaField("lightingPreference", "光影偏好", item.lightingPreference || "")}
+      ${textareaField("lensLanguage", "镜头语言", item.lensLanguage || "")}
+      <div class="field-grid two-col">
+        ${textareaField("characterTexture", "人物质感", item.characterTexture || "")}
+        ${textareaField("filmGrain", "胶片颗粒", item.filmGrain || "")}
+      </div>
+      ${textareaField("defaultNegative", "默认负面提示词", item.defaultNegative || "")}
+    </section>
+  `;
+  openModal();
+}
+
 function handleModalSubmit(event) {
   event.preventDefault();
   const formData = new FormData(dom.modalForm);
@@ -2699,6 +2884,7 @@ function handleModalSubmit(event) {
   if (modalMode === "preset") savePreset(data);
   if (modalMode === "tag") saveTag(data.tag);
   if (modalMode === "model") saveModel(data);
+  if (modalMode === "project") saveProject(data);
   if (modalMode === "moduleQuickTypes") saveModuleQuickTypes(formData);
   closeModal();
   saveState();
@@ -2768,6 +2954,32 @@ function saveModel(data) {
     priority: Number(data.priority) || 0,
   };
   upsert(state.models, model);
+}
+
+function saveProject(data) {
+  const project = {
+    id: modalEditingId || createId("project"),
+    ...data,
+    updatedAt: today(),
+  };
+  upsert(state.projects, project);
+  state.activeProjectId = project.id;
+  applyProjectDefaults(project);
+  regenerateResults();
+}
+
+function deleteActiveProject() {
+  const project = getActiveProject();
+  if (!project || state.projects.length <= 1) return;
+  const ok = confirm(`确认删除项目风格母版「${project.name}」吗？`);
+  if (!ok) return;
+  state.projects = state.projects.filter((item) => item.id !== project.id);
+  state.activeProjectId = state.projects[0]?.id || DEFAULT_STATE.activeProjectId;
+  applyProjectDefaults(getActiveProject());
+  regenerateResults();
+  saveState();
+  renderWorkbench();
+  showToast("项目风格母版已删除");
 }
 
 function saveCurrentPreset() {
