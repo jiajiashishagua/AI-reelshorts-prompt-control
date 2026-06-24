@@ -569,6 +569,137 @@ body.dark .simple-result-input {
   min-width: 196px;
 }
 
+.smart-recall-panel {
+  display: grid;
+  gap: 14px;
+  margin: 0 auto 18px;
+  padding: 18px;
+  border: 1px solid #ded9e7;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  text-align: left;
+  box-shadow: 0 14px 46px rgba(44, 40, 54, 0.06);
+}
+
+body.dark .smart-recall-panel {
+  border-color: #332f3b;
+  background: rgba(29, 28, 33, 0.9);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.26);
+}
+
+.smart-recall-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.smart-recall-head h3 {
+  margin: 0;
+  color: #201c28;
+  font-size: 1.12rem;
+}
+
+body.dark .smart-recall-head h3 {
+  color: #f3f0f7;
+}
+
+.smart-recall-head span,
+.smart-recall-empty {
+  color: #7c7486;
+  font-size: 0.82rem;
+}
+
+body.dark .smart-recall-head span,
+body.dark .smart-recall-empty {
+  color: #afa6bd;
+}
+
+.smart-recall-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.smart-recall-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #ded9e7;
+  border-radius: 12px;
+  background: rgba(248, 247, 251, 0.92);
+}
+
+body.dark .smart-recall-card {
+  border-color: #3b3545;
+  background: rgba(35, 33, 41, 0.92);
+}
+
+.smart-recall-card.is-locked {
+  border-color: #8f7aae;
+  box-shadow: inset 0 0 0 1px rgba(143, 122, 174, 0.35);
+}
+
+.smart-recall-card-head {
+  display: grid;
+  gap: 4px;
+}
+
+.smart-recall-card-head span {
+  width: max-content;
+  padding: 2px 8px;
+  color: #6f5c89;
+  border-radius: 999px;
+  background: rgba(125, 108, 150, 0.12);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+body.dark .smart-recall-card-head span {
+  color: #d3c5e9;
+  background: rgba(156, 136, 190, 0.18);
+}
+
+.smart-recall-card-head strong {
+  overflow: hidden;
+  color: #25212c;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dark .smart-recall-card-head strong {
+  color: #f0edf5;
+}
+
+.smart-recall-card p {
+  display: -webkit-box;
+  min-height: 38px;
+  margin: 0;
+  overflow: hidden;
+  color: #736b7c;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body.dark .smart-recall-card p {
+  color: #b9b0c8;
+}
+
+.smart-recall-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.smart-recall-actions .compact {
+  min-height: 32px;
+  padding-inline: 9px;
+  font-size: 0.76rem;
+}
+
 .simple-params-card {
   display: grid;
   gap: 22px;
@@ -2228,6 +2359,10 @@ tr:last-child td {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .smart-recall-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workbench-layout {
     grid-template-columns: 290px minmax(360px, 1fr);
   }
@@ -2411,6 +2546,15 @@ tr:last-child td {
 
   .simple-param-grid,
   .simple-negative-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-recall-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .smart-recall-grid {
     grid-template-columns: 1fr;
   }
 

@@ -251,6 +251,7 @@ const DEFAULT_STATE = {
     negativeOptions: NEGATIVE_OPTIONS.slice(),
     customNegative: "",
     optimizationNotes: [],
+    lockedRecallIds: [],
     selectedModuleIds: {
       scene: "module-scene-window",
       camera: "module-camera-close",
@@ -910,6 +911,7 @@ function mergeState(base, saved) {
       results: { ...base.workbench.results, ...(savedWorkbench.results || {}) },
       negativeOptions: Array.isArray(savedWorkbench.negativeOptions) ? savedWorkbench.negativeOptions : base.workbench.negativeOptions,
       optimizationNotes: Array.isArray(savedWorkbench.optimizationNotes) ? savedWorkbench.optimizationNotes : base.workbench.optimizationNotes,
+      lockedRecallIds: Array.isArray(savedWorkbench.lockedRecallIds) ? savedWorkbench.lockedRecallIds : base.workbench.lockedRecallIds,
     },
     roles: mergeById(base.roles, saved.roles),
     modules: mergeById(base.modules, saved.modules),
@@ -955,6 +957,27 @@ function applyProjectDefaults(project) {
   if (!project) return;
   if (project.defaultModel) state.workbench.targetTool = project.defaultModel;
   if (project.defaultAspectRatio) state.workbench.aspectRatio = project.defaultAspectRatio;
+}
+
+function applyRecalledModule(moduleId) {
+  const module = getModule(moduleId);
+  if (!module) return;
+  state.workbench.selectedModuleIds[module.type] = module.id;
+  delete state.workbench.moduleOverrides[module.type];
+  module.uses = (Number(module.uses) || 0) + 1;
+  module.updatedAt = today();
+}
+
+function toggleRecallLock(moduleId) {
+  const ids = new Set(state.workbench.lockedRecallIds || []);
+  if (ids.has(moduleId)) {
+    ids.delete(moduleId);
+    showToast("已取消锁定召回词条");
+  } else {
+    ids.add(moduleId);
+    showToast("已锁定召回词条");
+  }
+  state.workbench.lockedRecallIds = [...ids].filter((id) => getModule(id));
 }
 
 function syncPromptTypeWithMode() {
@@ -1050,6 +1073,7 @@ function renderWorkbench() {
             优化提示词
           </button>
         </div>
+        ${renderSmartRecallPanel(getSmartRecallEntries())}
         <section class="simple-params-card">
           ${renderProjectStyleBar(project)}
           ${renderSimpleParameterGrid(role)}
@@ -1146,6 +1170,51 @@ function renderProjectStyleBar(project) {
         </button>
       </div>
     </section>
+  `;
+}
+
+function renderSmartRecallPanel(entries) {
+  const lockedCount = state.workbench.lockedRecallIds?.length || 0;
+  return `
+    <section class="smart-recall-panel" aria-label="本次参考的存储词条">
+      <div class="smart-recall-head">
+        <div>
+          <p class="eyebrow">智能召回</p>
+          <h3>本次参考的存储词条</h3>
+        </div>
+        <span>${entries.length} 条匹配 / ${lockedCount} 条锁定</span>
+      </div>
+      ${entries.length ? `
+        <div class="smart-recall-grid">
+          ${entries.map(renderSmartRecallCard).join("")}
+        </div>
+      ` : `
+        <p class="smart-recall-empty">输入剧情、场景、角色、情绪或光影关键词后，系统会从存储库自动召回可参考词条。</p>
+      `}
+    </section>
+  `;
+}
+
+function renderSmartRecallCard(entry) {
+  const typeLabel = getModuleTypeLabel(entry.module.type);
+  const locked = state.workbench.lockedRecallIds?.includes(entry.module.id);
+  const selected = state.workbench.selectedModuleIds?.[entry.module.type] === entry.module.id;
+  return `
+    <article class="smart-recall-card ${locked ? "is-locked" : ""}">
+      <div class="smart-recall-card-head">
+        <span>${escapeHtml(typeLabel)}</span>
+        <strong>${escapeHtml(entry.module.name)}</strong>
+      </div>
+      <p>${escapeHtml(entry.reasons.join("；") || "与当前输入语义相近")}</p>
+      <div class="smart-recall-actions">
+        <button class="ghost-button compact" type="button" data-apply-recall="${entry.module.id}" ${selected ? "disabled" : ""}>
+          <i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "已加入" : "加入当前提示词"}
+        </button>
+        <button class="ghost-button compact" type="button" data-toggle-recall-lock="${entry.module.id}">
+          <i data-lucide="${locked ? "lock" : "unlock"}"></i>${locked ? "已锁定" : "锁定"}
+        </button>
+      </div>
+    </article>
   `;
 }
 
@@ -1611,6 +1680,25 @@ function bindWorkbenchEvents() {
 
   const deleteProjectButton = document.getElementById("deleteProjectBtn");
   if (deleteProjectButton) deleteProjectButton.addEventListener("click", deleteActiveProject);
+
+  document.querySelectorAll("[data-apply-recall]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyRecalledModule(button.dataset.applyRecall);
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+      showToast("已加入当前提示词");
+    });
+  });
+
+  document.querySelectorAll("[data-toggle-recall-lock]").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleRecallLock(button.dataset.toggleRecallLock);
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
 
   document.querySelectorAll("[data-workbench-mode]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2260,6 +2348,7 @@ function renderProjectStyleMaster(project, language = "zh") {
 
 function getRepositoryReferenceModules(selectedModules, promptType, task) {
   const selectedIds = new Set(selectedModules.map((item) => item.module.id));
+  const recalledModules = getSmartRecallEntries(12).map((entry) => entry.module);
   const shouldUseExpression = [promptType, task, state.workbench.activeCategory]
     .filter(Boolean)
     .some((item) => String(item).includes("微表情") || String(item).includes("画面") || String(item).includes("视频"));
@@ -2268,9 +2357,138 @@ function getRepositoryReferenceModules(selectedModules, promptType, task) {
     : [];
   const explicitReferences = selectedModules.map((item) => item.module);
   const orderedReferences = shouldUseExpression
-    ? [...expressionReferences, ...explicitReferences]
-    : explicitReferences;
+    ? [...recalledModules, ...expressionReferences, ...explicitReferences]
+    : [...recalledModules, ...explicitReferences];
   return uniqueById(orderedReferences).slice(0, 12);
+}
+
+function getSmartRecallEntries(limit = 8) {
+  const lockedIds = new Set((state.workbench.lockedRecallIds || []).filter((id) => getModule(id)));
+  const context = buildRecallContext();
+  const entries = state.modules
+    .map((module) => scoreModuleRecall(module, context, lockedIds.has(module.id)))
+    .filter((entry) => entry.score > 0 || lockedIds.has(entry.module.id))
+    .sort((a, b) => b.score - a.score || Number(b.module.favorite) - Number(a.module.favorite) || (b.module.uses || 0) - (a.module.uses || 0));
+  const lockedEntries = entries.filter((entry) => lockedIds.has(entry.module.id));
+  const unlockedEntries = entries.filter((entry) => !lockedIds.has(entry.module.id));
+  return uniqueRecallEntries([...lockedEntries, ...unlockedEntries]).slice(0, limit);
+}
+
+function buildRecallContext() {
+  const wb = state.workbench;
+  const role = getRole(wb.roleId);
+  const project = getActiveProject();
+  const rawParts = [
+    wb.sourceBrief,
+    wb.sceneGoal,
+    wb.frameDescription,
+    wb.extra,
+    wb.goal,
+    wb.promptType,
+    getWorkbenchTask(),
+    wb.characterState,
+    wb.relationTension,
+    wb.shotSize,
+    wb.cameraAngle,
+    wb.composition,
+    wb.blocking,
+    wb.action,
+    wb.actionDetail,
+    wb.eye,
+    wb.mouth,
+    wb.breath,
+    wb.expressionDetail,
+    wb.lightingControl,
+    wb.atmosphere,
+    wb.texture,
+    wb.customNegative,
+    role?.name,
+    role?.identity,
+    role?.temperament,
+    role?.tags?.join(" "),
+    project?.name,
+    project?.visualTone,
+    project?.colorLogic,
+    project?.lightingPreference,
+    project?.lensLanguage,
+  ].filter(Boolean);
+  const text = normalizeRecallText(rawParts.join(" "));
+  const tokens = new Set();
+  rawParts.forEach((part) => extractRecallTokens(part).forEach((token) => tokens.add(token)));
+  deriveRecallTokens(text).forEach((token) => tokens.add(token));
+  return { text, tokens: [...tokens].filter((token) => token.length >= 2) };
+}
+
+function scoreModuleRecall(module, context, locked = false) {
+  const typeLabel = getModuleTypeLabel(module.type);
+  const fields = [
+    ["标题", module.name, 8],
+    ["中文内容", module.zh, 2],
+    ["标签", (module.tags || []).join(" "), 7],
+    ["适用场景", module.scenarios, 6],
+    ["词条类型", typeLabel, 5],
+    ["效果备注", module.notes, 2],
+  ];
+  let score = locked ? 1000 : 0;
+  const reasons = [];
+  for (const token of context.tokens) {
+    for (const [label, value, weight] of fields) {
+      const haystack = normalizeRecallText(value || "");
+      if (!haystack || !haystack.includes(token)) continue;
+      score += weight + Math.min(token.length, 6);
+      if (reasons.length < 3) reasons.push(`${label}匹配「${token}」`);
+      break;
+    }
+  }
+  if (module.favorite) score += 2;
+  if (module.type === state.workbench.activeCategory) score += 2;
+  if (locked && reasons.length === 0) reasons.push("用户已锁定");
+  return { module, score, reasons: unique(reasons) };
+}
+
+function extractRecallTokens(value) {
+  const text = normalizeRecallText(value || "");
+  const tokens = text
+    .split(/[\s,，。；;、：:\/\\|【】\[\]（）()《》<>「」"'!?！？]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const domainTokens = [
+    "夜色", "夜晚", "雨夜", "窗边", "窗边光", "愤怒", "冷怒", "愠怒", "克制", "隐忍", "压抑",
+    "近景", "特写", "镜头", "光影", "侧逆光", "逆光", "电影感", "微表情", "动作", "场景",
+    "委屈", "哀伤", "喜悦", "震惊", "错愕", "淡漠", "疏离", "审视", "高对比", "低饱和",
+  ].filter((token) => text.includes(normalizeRecallText(token)));
+  return unique([...tokens, ...domainTokens]);
+}
+
+function deriveRecallTokens(text) {
+  const tokens = [];
+  const rules = [
+    [/夜色|夜晚|夜里|雨夜|夜戏|窗外/, ["夜色", "夜晚", "雨夜", "窗边光"]],
+    [/窗边|窗户|落地窗|玻璃/, ["窗边", "窗边光", "自然光"]],
+    [/压住|强忍|忍住|隐忍|克制|压抑|不爆发/, ["克制", "隐忍", "压抑", "强忍"]],
+    [/愤怒|怒|生气|愠怒|冷怒/, ["愤怒", "愠怒", "冷怒", "压抑"]],
+    [/真相|揭露|对峙|冲突|背叛/, ["对峙", "情绪爆发", "揭露真相"]],
+    [/眼神|眼尾|红眼|泪|表情/, ["微表情", "眼神", "隐忍红眼"]],
+    [/近景|特写|脸|面部|眼睛/, ["近景", "特写", "微表情"]],
+    [/电影|高级|短剧|质感/, ["电影感", "高级感", "ReelShort"]],
+  ];
+  rules.forEach(([pattern, values]) => {
+    if (pattern.test(text)) tokens.push(...values);
+  });
+  return unique(tokens.map(normalizeRecallText));
+}
+
+function normalizeRecallText(value) {
+  return String(value || "").toLowerCase().replace(/\s+/g, "");
+}
+
+function uniqueRecallEntries(entries) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    if (!entry?.module?.id || seen.has(entry.module.id)) return false;
+    seen.add(entry.module.id);
+    return true;
+  });
 }
 
 function renderRepositoryReference(modules, language = "zh") {
@@ -3169,6 +3387,10 @@ function getPreset(id) {
 
 function getModel(id) {
   return state.models.find((item) => item.id === id);
+}
+
+function getModuleTypeLabel(typeId) {
+  return MODULE_TYPES.find((item) => item.id === typeId)?.label || typeId || "词条";
 }
 
 function upsert(collection, item) {
