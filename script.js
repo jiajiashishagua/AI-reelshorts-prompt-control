@@ -40,6 +40,19 @@ const MODULE_TYPES = [
 
 const DEFAULT_MODULE_QUICK_TYPES = ["lighting", "camera", "action", "expression", "texture", "negative"];
 
+const AI_BREAKDOWN_SECTIONS = [
+  { id: "sceneSpace", label: "场景空间", icon: "map", target: "frameDescription" },
+  { id: "lightingMood", label: "光影氛围", icon: "lightbulb", target: "lightingControl" },
+  { id: "colorLogic", label: "色彩逻辑", icon: "palette" },
+  { id: "cameraParams", label: "相机参数", icon: "camera" },
+  { id: "blocking", label: "人物站位", icon: "users", target: "blocking" },
+  { id: "action", label: "人物动作", icon: "move-3d", target: "actionDetail" },
+  { id: "microExpression", label: "微表情", icon: "sparkles", target: "expressionDetail" },
+  { id: "cameraMotion", label: "镜头运动", icon: "scan-eye", target: "cameraSpeed" },
+  { id: "texture", label: "画面质感", icon: "image", target: "texture" },
+  { id: "negative", label: "负面约束", icon: "shield-x", target: "customNegative" },
+];
+
 const GOAL_OPTIONS = [
   "人物登场",
   "情绪爆发",
@@ -252,6 +265,13 @@ const DEFAULT_STATE = {
     customNegative: "",
     optimizationNotes: [],
     lockedRecallIds: [],
+    aiBreakdown: {
+      generatedAt: "",
+      source: "",
+      selectedOptionIds: {},
+      customValues: {},
+      cards: [],
+    },
     selectedModuleIds: {
       scene: "module-scene-window",
       camera: "module-camera-close",
@@ -912,6 +932,13 @@ function mergeState(base, saved) {
       negativeOptions: Array.isArray(savedWorkbench.negativeOptions) ? savedWorkbench.negativeOptions : base.workbench.negativeOptions,
       optimizationNotes: Array.isArray(savedWorkbench.optimizationNotes) ? savedWorkbench.optimizationNotes : base.workbench.optimizationNotes,
       lockedRecallIds: Array.isArray(savedWorkbench.lockedRecallIds) ? savedWorkbench.lockedRecallIds : base.workbench.lockedRecallIds,
+      aiBreakdown: {
+        ...base.workbench.aiBreakdown,
+        ...(savedWorkbench.aiBreakdown || {}),
+        selectedOptionIds: { ...base.workbench.aiBreakdown.selectedOptionIds, ...(savedWorkbench.aiBreakdown?.selectedOptionIds || {}) },
+        customValues: { ...base.workbench.aiBreakdown.customValues, ...(savedWorkbench.aiBreakdown?.customValues || {}) },
+        cards: Array.isArray(savedWorkbench.aiBreakdown?.cards) ? savedWorkbench.aiBreakdown.cards : base.workbench.aiBreakdown.cards,
+      },
     },
     roles: mergeById(base.roles, saved.roles),
     modules: mergeById(base.modules, saved.modules),
@@ -1064,6 +1091,10 @@ function renderWorkbench() {
             <i data-lucide="copy"></i>
             复制提示词
           </button>
+          <button class="pf-button pf-secondary" type="button" id="topAiBreakdownBtn">
+            <i data-lucide="sparkles"></i>
+            AI拆解画面
+          </button>
           <button class="pf-button pf-secondary" type="button" id="savePresetBtn">
             <i data-lucide="save"></i>
             保存到提示词库
@@ -1074,6 +1105,7 @@ function renderWorkbench() {
           </button>
         </div>
         ${renderSmartRecallPanel(getSmartRecallEntries())}
+        ${renderAiBreakdownPanel()}
         <section class="simple-params-card">
           ${renderProjectStyleBar(project)}
           ${renderSimpleParameterGrid(role)}
@@ -1214,6 +1246,61 @@ function renderSmartRecallCard(entry) {
           <i data-lucide="${locked ? "lock" : "unlock"}"></i>${locked ? "已锁定" : "锁定"}
         </button>
       </div>
+    </article>
+  `;
+}
+
+function renderAiBreakdownPanel() {
+  const breakdown = getAiBreakdownState();
+  const hasCards = breakdown.cards.length > 0;
+  return `
+    <section class="ai-breakdown-panel" aria-label="AI画面拆解">
+      <div class="ai-breakdown-head">
+        <div>
+          <p class="eyebrow">画面拆解</p>
+          <h3>AI画面拆解</h3>
+          <span>基于当前项目风格母版、角色资产与本次召回词条生成候选方案。</span>
+        </div>
+        <button class="pf-button pf-primary" type="button" id="aiBreakdownBtn">
+          <i data-lucide="wand-sparkles"></i>
+          AI拆解画面
+        </button>
+      </div>
+      ${hasCards ? `
+        <div class="ai-breakdown-meta">
+          <span>本地模拟生成</span>
+          <span>${escapeHtml(breakdown.source || state.workbench.sourceBrief || "当前画面")}</span>
+        </div>
+        <div class="ai-breakdown-grid">
+          ${breakdown.cards.map(renderAiBreakdownCard).join("")}
+        </div>
+      ` : `
+        <p class="ai-breakdown-empty">输入剧情或画面描述后，点击“AI拆解画面”，系统会先给出场景、光影、动作、微表情、镜头等结构化候选卡片。</p>
+      `}
+    </section>
+  `;
+}
+
+function renderAiBreakdownCard(card) {
+  const breakdown = getAiBreakdownState();
+  const section = AI_BREAKDOWN_SECTIONS.find((item) => item.id === card.id) || card;
+  const selectedId = breakdown.selectedOptionIds[card.id] || card.options?.[0]?.id || "";
+  const selectedOption = card.options?.find((item) => item.id === selectedId) || card.options?.[0];
+  const currentValue = breakdown.customValues[card.id] ?? selectedOption?.text ?? "";
+  return `
+    <article class="ai-breakdown-card">
+      <div class="ai-breakdown-card-head">
+        <span><i data-lucide="${section.icon || "sparkles"}"></i>${escapeHtml(section.label || card.label)}</span>
+      </div>
+      <div class="ai-breakdown-options">
+        ${(card.options || []).map((option) => `
+          <button class="breakdown-option ${option.id === selectedId ? "is-selected" : ""}" type="button" data-breakdown-option="${escapeHtml(card.id)}::${escapeHtml(option.id)}">
+            <strong>${escapeHtml(option.title)}</strong>
+            <small>${escapeHtml(option.reason)}</small>
+          </button>
+        `).join("")}
+      </div>
+      <textarea class="breakdown-edit" data-breakdown-edit="${escapeHtml(card.id)}" rows="4">${escapeHtml(currentValue)}</textarea>
     </article>
   `;
 }
@@ -1700,6 +1787,33 @@ function bindWorkbenchEvents() {
     });
   });
 
+  document.querySelectorAll("#aiBreakdownBtn, #topAiBreakdownBtn").forEach((aiBreakdownButton) => {
+    aiBreakdownButton.addEventListener("click", async () => {
+      await generateAiBreakdown();
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+      showToast("AI画面拆解已生成");
+    });
+  });
+
+  document.querySelectorAll("[data-breakdown-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const [sectionId, optionId] = button.dataset.breakdownOption.split("::");
+      selectAiBreakdownOption(sectionId, optionId);
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
+
+  document.querySelectorAll("[data-breakdown-edit]").forEach((textarea) => {
+    textarea.addEventListener("input", (event) => {
+      updateAiBreakdownValue(event.target.dataset.breakdownEdit, event.target.value);
+      regenerateResults();
+    });
+  });
+
   document.querySelectorAll("[data-workbench-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       wb.mode = button.dataset.workbenchMode;
@@ -2008,6 +2122,326 @@ function applyInsightToEditor() {
   ].join("\n");
 }
 
+function getAiBreakdownState() {
+  const wb = state.workbench;
+  if (!wb.aiBreakdown) wb.aiBreakdown = clone(DEFAULT_STATE.workbench.aiBreakdown);
+  wb.aiBreakdown.selectedOptionIds = wb.aiBreakdown.selectedOptionIds || {};
+  wb.aiBreakdown.customValues = wb.aiBreakdown.customValues || {};
+  wb.aiBreakdown.cards = Array.isArray(wb.aiBreakdown.cards) ? wb.aiBreakdown.cards : [];
+  return wb.aiBreakdown;
+}
+
+async function generateAiBreakdown() {
+  const context = buildAiBreakdownContext();
+  state.workbench.aiBreakdown = await requestAiBreakdownFromModel(context);
+  applyAiBreakdownToWorkbench();
+  saveState();
+}
+
+async function requestAiBreakdownFromModel(context) {
+  // Future API seam: replace this local simulator with a real model request.
+  return generateLocalAiBreakdown(context);
+}
+
+function buildAiBreakdownContext() {
+  const wb = state.workbench;
+  const role = getRole(wb.roleId);
+  const project = getActiveProject();
+  const recalledEntries = getSmartRecallEntries(8);
+  return {
+    brief: wb.sourceBrief || wb.sceneGoal || wb.frameDescription || "女主在夜色窗边压住愤怒，准备说出真相",
+    frameDescription: wb.frameDescription,
+    extra: wb.extra,
+    project,
+    role,
+    recalledEntries,
+    recalledModules: recalledEntries.map((entry) => entry.module),
+  };
+}
+
+function generateLocalAiBreakdown(context) {
+  const selectedOptionIds = {};
+  const customValues = {};
+  const cards = AI_BREAKDOWN_SECTIONS.map((section) => {
+    const options = buildBreakdownOptions(section, context).slice(0, 3).map((option, index) => ({
+      id: `${section.id}-${index + 1}`,
+      title: option.title,
+      text: option.text,
+      reason: option.reason,
+    }));
+    selectedOptionIds[section.id] = options[0]?.id || "";
+    customValues[section.id] = options[0]?.text || "";
+    return { id: section.id, label: section.label, icon: section.icon, options };
+  });
+  return {
+    generatedAt: new Date().toISOString(),
+    source: context.brief,
+    selectedOptionIds,
+    customValues,
+    cards,
+  };
+}
+
+function buildBreakdownOptions(section, context) {
+  const { brief, project, role, recalledModules } = context;
+  const recallText = summarizeRecallModules(recalledModules);
+  const roleName = role?.name || "当前角色";
+  const projectTone = project?.visualTone || "高级短剧电影感";
+  const projectColor = project?.colorLogic || "低饱和、冷暖克制对比";
+  const projectLight = project?.lightingPreference || "窗边侧光、柔和暗部、保留真实阴影";
+  const projectLens = project?.lensLanguage || "近景、过肩、轻微推进，强调情绪压迫";
+  const projectTexture = project?.characterTexture || "真人皮肤质感、保留细节纹理";
+  const projectGrain = project?.filmGrain || "细腻胶片颗粒";
+  const defaultNegative = project?.defaultNegative || "避免夸张表情、塑料皮肤、脸部跑偏和过度柔焦";
+
+  const options = {
+    sceneSpace: [
+      {
+        title: "夜色窗边近景",
+        text: `室内夜色窗边空间，${roleName}靠近玻璃站立，窗外城市冷光与雨夜反光虚化成背景，人物与窗框形成压迫性的边缘构图，画面基调保持${projectTone}，核心围绕“${brief}”。`,
+        reason: "匹配剧情中的夜色、窗边与真相揭露",
+      },
+      {
+        title: "窄空间对峙",
+        text: "压缩的室内近景空间，人物被窗框、墙面或桌沿切割在画面一侧，背景只保留少量环境信息，让空间服务于克制、隐忍、即将摊牌的叙事张力。",
+        reason: "强化人物被情绪挤压的空间感",
+      },
+      {
+        title: "参考图优先空间",
+        text: "若上传参考图，优先识别图中的空间结构、主光方向、窗户位置和人物可站立区域，再把剧情动作嵌入原有空间，不随意改变场景资产。",
+        reason: "为后续接入视觉模型预留规则",
+      },
+    ],
+    lightingMood: [
+      {
+        title: "冷暖窗边侧光",
+        text: `${projectLight}。主光来自窗外蓝冷夜光，室内保留一层极弱暖光补面，人物半边脸被柔和侧逆光勾出轮廓，暗部不死黑，眼神里有压住愤怒的湿润高光。参考召回：${recallText}。`,
+        reason: "结合项目母版光影和召回词条",
+      },
+      {
+        title: "低照度压迫光",
+        text: "整体低照度、高级灰暗调，窗外霓虹或月光在脸侧形成窄光带，背景轻微失焦，阴影面积大但保留皮肤和服装纹理，营造真相即将出口前的窒息感。",
+        reason: "适合情绪克制与夜戏",
+      },
+      {
+        title: "泪光控制光",
+        text: "用极细的眼部 catch light 控制微表情，避免大面积亮脸；高光只落在眼尾、鼻梁边缘和唇线，既看见怒意，也不让表演变成哭戏。",
+        reason: "服务微表情精度",
+      },
+    ],
+    colorLogic: [
+      {
+        title: "冷蓝紫主调",
+        text: `${projectColor}。画面以冷蓝、灰紫、黑白灰为主，室内少量暖金或肤色作为情绪反差，降低饱和度，避免艳丽霓虹抢走人物表演。`,
+        reason: "贴合项目母版与高级灰紫调",
+      },
+      {
+        title: "真相前冷暖对撞",
+        text: "人物脸部用冷光压住情绪，背景保留极弱暖色生活痕迹，形成“外冷内热”的色彩逻辑，暗示她表面克制但内心即将爆发。",
+        reason: "把叙事信息写进色彩",
+      },
+      {
+        title: "低饱和电影调色",
+        text: "降低整体饱和度与对比度，压高光、提少量暗部细节，肤色保持真实不过分美白，蓝紫阴影与暖色皮肤之间要有自然过渡。",
+        reason: "保证真人质感和统一图片风格",
+      },
+    ],
+    cameraParams: [
+      {
+        title: "电影近景参数",
+        text: "ARRI Alexa / Amira 质感，Cooke 35mm 或 50mm 定焦，T1.4-T2.0，24fps，EI 800，180°快门，Log-C，竖屏 9:16，浅景深但五官清晰，ProRes 4444 XQ / ARRIRAW 质感。",
+        reason: "延续平台已有电影机参数体系",
+      },
+      {
+        title: "窗边夜戏白平衡",
+        text: "白平衡 4300K-5200K，保留窗外冷色倾向，曝光略压 -0.3 到 0 档，高光不过曝，暗部保留服装和发丝层次。",
+        reason: "适合冷调窗边夜景",
+      },
+      {
+        title: "情绪特写参数",
+        text: "50mm 人像近景或轻微长焦压缩，焦点锁定眼睛，背景散景柔和，运动幅度极小，避免广角畸变和AI面部变形。",
+        reason: "保护微表情和脸部一致性",
+      },
+    ],
+    blocking: [
+      {
+        title: "边缘站位",
+        text: `${roleName}站在画面边侧靠近窗户，身体略微背向对话对象，脸转向镜头三分之二侧面，留出窗外冷色负空间，突出未说出口的真相。`,
+        reason: "匹配窗边与克制情绪",
+      },
+      {
+        title: "压迫居中",
+        text: "人物居中但被窗框线条切割，肩颈收紧，下颌微收，画面四周留出黑暗空间，让观众感到她被环境与秘密包围。",
+        reason: "更强烈的戏剧压迫",
+      },
+      {
+        title: "对话前距离",
+        text: "如果画面包含对手，二人保持一臂以上距离，女主更靠近窗边，对手处于前景虚化或画外，只用站位暗示冲突。",
+        reason: "适合对话冲突前一秒",
+      },
+    ],
+    action: [
+      {
+        title: "压住愤怒的小动作",
+        text: `${roleName}指尖轻轻攥紧衣角或窗帘边缘，肩膀僵硬但动作幅度很小，开口前先短暂停顿，像是在把怒气压回喉咙。`,
+        reason: "把“压住愤怒”转成可拍动作",
+      },
+      {
+        title: "准备说出真相",
+        text: "她先避开视线，随后缓慢抬眼看向对方，手指从攥紧到松开一半，呼吸变浅，嘴唇轻启但没有立刻说话。",
+        reason: "适合真相揭露前的动作节奏",
+      },
+      {
+        title: "克制爆发前",
+        text: "身体不大幅移动，只让指节、下颌、肩颈和眼神完成情绪递进，动作延迟半拍，避免戏剧化甩头、拍桌或夸张哭喊。",
+        reason: "符合高精度短剧表演控制",
+      },
+    ],
+    microExpression: [
+      {
+        title: "愤怒但克制",
+        text: "眼尾微红但不落泪，眉头向内压低，嘴唇紧抿后轻微分开，鼻翼极轻收缩，眼神短暂闪躲后重新稳定，怒意被压在冷静表面下。",
+        reason: "参考愤怒类微表情词条",
+      },
+      {
+        title: "真相出口前",
+        text: "眼神先失焦一瞬，随后聚焦到对方身上；下颌微微绷紧，喉结或颈部吞咽感轻微出现，呼吸压低，语气还没出来但情绪已经到达临界点。",
+        reason: "更强调叙事转折",
+      },
+      {
+        title: "冷静掩饰裂缝",
+        text: "表情整体冷静，只有眼尾湿润、眉峰轻抖、唇角下压这几个细节泄露真实情绪，不要大哭、不要怒吼、不要夸张皱脸。",
+        reason: "控制人物高级感与一致性",
+      },
+    ],
+    cameraMotion: [
+      {
+        title: "极慢推进",
+        text: `${projectLens}。镜头从近景极慢推进到更紧的眼部近景，移动速度克制，推进只服务于真相即将说出口的心理压力。`,
+        reason: "适合压迫情绪递进",
+      },
+      {
+        title: "静止观察",
+        text: "镜头基本静止，轻微手持呼吸感，保持观众像旁观者一样被迫看见她的克制，不使用明显摇晃或炫技运动。",
+        reason: "更沉稳、更高级",
+      },
+      {
+        title: "过肩压迫",
+        text: "若有对手，使用轻微过肩前景遮挡，女主眼睛保持清晰焦点，镜头只做微小横移，让空间距离和视线压力参与叙事。",
+        reason: "适合对话冲突场面",
+      },
+    ],
+    texture: [
+      {
+        title: "真人电影皮肤",
+        text: `${projectTexture}，保留皮肤真实纹理、发丝边缘和服装材质，${projectGrain}，画面不塑料、不磨皮，整体是写实真人电影剧照质感。`,
+        reason: "来自项目人物质感与胶片颗粒",
+      },
+      {
+        title: "低噪夜戏质感",
+        text: "夜戏暗部有细腻颗粒和真实噪点，但不能脏乱；窗外散景柔和，室内边缘不过度锐化，保持高级短剧的自然真实感。",
+        reason: "适合夜色窗边",
+      },
+      {
+        title: "克制高光质感",
+        text: "高光柔和但不糊，眼部与唇线保留精细反光，服装深色区域仍有层次，避免AI渲染感、过度平滑和玻璃皮肤。",
+        reason: "保护最终画面可控性",
+      },
+    ],
+    negative: [
+      {
+        title: "角色一致性约束",
+        text: `${defaultNegative}。不要改变角色脸型、发色、年龄感和服装主色调；不要幼态化、欧美化、卡通化或过度美颜。`,
+        reason: "来自项目默认负面提示词",
+      },
+      {
+        title: "表演约束",
+        text: "避免夸张大哭、怒吼、瞪眼、甩头、拍桌、表情崩坏；不要让“愤怒”变成粗暴肢体动作，要保持隐忍和克制。",
+        reason: "匹配当前剧情表演需求",
+      },
+      {
+        title: "画面约束",
+        text: "避免低清晰度、塑料皮肤、五官漂移、手指错误、窗外背景抢戏、过曝霓虹、死黑暗部、过度柔焦和廉价网感滤镜。",
+        reason: "保证电影级画面质量",
+      },
+    ],
+  };
+
+  return options[section.id] || [];
+}
+
+function summarizeRecallModules(modules) {
+  const summary = (modules || [])
+    .slice(0, 4)
+    .map((module) => `${getModuleTypeLabel(module.type)} / ${module.name}`)
+    .join("；");
+  return summary || "暂无强召回词条";
+}
+
+function selectAiBreakdownOption(sectionId, optionId) {
+  const breakdown = getAiBreakdownState();
+  const card = breakdown.cards.find((item) => item.id === sectionId);
+  const option = card?.options?.find((item) => item.id === optionId);
+  if (!option) return;
+  breakdown.selectedOptionIds[sectionId] = optionId;
+  breakdown.customValues[sectionId] = option.text;
+  applyAiBreakdownToWorkbench(sectionId);
+}
+
+function updateAiBreakdownValue(sectionId, value) {
+  const breakdown = getAiBreakdownState();
+  breakdown.customValues[sectionId] = value;
+  applyAiBreakdownToWorkbench(sectionId);
+}
+
+function applyAiBreakdownToWorkbench(sectionId = "") {
+  const wb = state.workbench;
+  const sections = sectionId
+    ? AI_BREAKDOWN_SECTIONS.filter((section) => section.id === sectionId)
+    : AI_BREAKDOWN_SECTIONS;
+  sections.forEach((section) => {
+    if (!section.target) return;
+    const value = getSelectedAiBreakdownValue(section.id);
+    if (value) wb[section.target] = value;
+  });
+}
+
+function getSelectedAiBreakdownValue(sectionId) {
+  const breakdown = getAiBreakdownState();
+  const card = breakdown.cards.find((item) => item.id === sectionId);
+  const selectedId = breakdown.selectedOptionIds[sectionId] || card?.options?.[0]?.id;
+  const selected = card?.options?.find((item) => item.id === selectedId) || card?.options?.[0];
+  return breakdown.customValues[sectionId] ?? selected?.text ?? "";
+}
+
+function renderSelectedAiBreakdown(language = "zh") {
+  const breakdown = getAiBreakdownState();
+  if (!breakdown.cards.length) {
+    return language === "zh" ? "未生成AI画面拆解。" : "No AI scene breakdown generated.";
+  }
+  return breakdown.cards.map((card) => {
+    const section = AI_BREAKDOWN_SECTIONS.find((item) => item.id === card.id) || card;
+    const value = getSelectedAiBreakdownValue(card.id);
+    return language === "zh"
+      ? `【${section.label}】${value}`
+      : `[${section.label}] ${value}`;
+  }).join("\n");
+}
+
+function getAiBreakdownForJson() {
+  const breakdown = getAiBreakdownState();
+  return breakdown.cards.map((card) => {
+    const section = AI_BREAKDOWN_SECTIONS.find((item) => item.id === card.id) || card;
+    return {
+      id: card.id,
+      label: section.label || card.label,
+      selectedOptionId: breakdown.selectedOptionIds[card.id] || card.options?.[0]?.id || "",
+      value: getSelectedAiBreakdownValue(card.id),
+      options: card.options || [],
+    };
+  });
+}
+
 function ensureWorkbenchResults() {
   if (!state.workbench.results || !state.workbench.results.zh) {
     regenerateResults();
@@ -2081,6 +2515,8 @@ function composePrompt() {
   const repositoryEn = renderRepositoryReference(repositoryReferenceModules, "en");
   const projectZh = renderProjectStyleMaster(project, "zh");
   const projectEn = renderProjectStyleMaster(project, "en");
+  const aiBreakdownZh = renderSelectedAiBreakdown("zh");
+  const aiBreakdownEn = renderSelectedAiBreakdown("en");
 
   const negativeModule = selectedModules.find((item) => item.type.id === "negative");
   const negative = [
@@ -2142,6 +2578,9 @@ function composePrompt() {
     "【项目风格母版】",
     projectZh,
     "",
+    "【AI画面拆解】",
+    aiBreakdownZh,
+    "",
     "【角色资产】",
     roleZh,
     "",
@@ -2192,6 +2631,9 @@ function composePrompt() {
     "",
     "[Project Style Master]",
     projectEn,
+    "",
+    "[AI Scene Breakdown]",
+    aiBreakdownEn,
     "",
     "[Character Asset]",
     roleEn,
@@ -2250,6 +2692,7 @@ function composePrompt() {
         defaultModel: project.defaultModel,
         defaultAspectRatio: project.defaultAspectRatio,
       } : null,
+      aiSceneBreakdown: getAiBreakdownForJson(),
       role: role ? { id: role.id, name: role.name, fixed: lines(role.fixed), variable: lines(role.variable), forbidden: lines(role.forbidden) } : null,
       sceneGoal: wb.sceneGoal,
       frameDescription: wb.frameDescription,
