@@ -1,14 +1,16 @@
 const STORAGE_KEY = "ai_reelshorts_prompt_control_v1";
 const KNOWLEDGE_CORE = window.KnowledgeCore;
+const KNOWLEDGE_INGESTION = window.KnowledgeIngestion;
 
-if (!KNOWLEDGE_CORE) {
-  throw new Error("知识库核心未加载，请刷新页面后重试。");
+if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION) {
+  throw new Error("知识库组件未加载，请刷新页面后重试。");
 }
 
 const NAV_ITEMS = [
   { id: "workbench", label: "工作台", icon: "wand-sparkles", title: "提示词创建工作台" },
   { id: "roles", label: "角色资产", icon: "user-round-cog", title: "角色资产库" },
   { id: "modules", label: "存储库", icon: "database", title: "提示词存储库" },
+  { id: "ingestion", label: "资料导入", icon: "file-up", title: "知识摄入中心" },
   { id: "presets", label: "预设库", icon: "library", title: "预设提示词库" },
   { id: "tags", label: "分类标签", icon: "tags", title: "分类与标签管理" },
   { id: "models", label: "模型配置", icon: "cpu", title: "模型配置" },
@@ -859,6 +861,9 @@ const DEFAULT_STATE = {
 let state = loadState();
 let modalMode = null;
 let modalEditingId = null;
+let ingestionSelectedIds = new Set();
+let ingestionBusy = false;
+let ingestionPage = 1;
 
 const dom = {
   nav: document.getElementById("mainNav"),
@@ -909,6 +914,7 @@ function bindShellEvents() {
   dom.quickCreate.addEventListener("click", () => {
     if (state.activeView === "roles" || state.activeView === "workbench") openRoleModal();
     if (state.activeView === "modules") openModuleModal();
+    if (state.activeView === "ingestion") document.getElementById("ingestionFileInput")?.click();
     if (state.activeView === "presets") openPresetModal();
     if (state.activeView === "tags") openTagModal();
     if (state.activeView === "models") openModelModal();
@@ -1111,6 +1117,7 @@ function render() {
   if (state.activeView === "workbench") renderWorkbench();
   if (state.activeView === "roles") renderRoles();
   if (state.activeView === "modules") renderModules();
+  if (state.activeView === "ingestion") renderIngestion();
   if (state.activeView === "presets") renderPresets();
   if (state.activeView === "tags") renderTags();
   if (state.activeView === "models") renderModels();
@@ -3400,6 +3407,510 @@ function renderKnowledgeFoundationSummary() {
   `;
 }
 
+function renderIngestion() {
+  const knowledge = KNOWLEDGE_CORE.migrateState(state.knowledge);
+  const query = getTempFilter("ingestionSearch", "").trim().toLowerCase();
+  const statusFilter = getTempFilter("ingestionStatus", "review");
+  const typeFilter = getTempFilter("ingestionType", "all");
+  const entries = knowledge.entries.filter((entry) => {
+    const matchesQuery = !query || searchable(entry).includes(query);
+    const matchesStatus = statusFilter === "all" || entry.status === statusFilter;
+    const matchesType = typeFilter === "all" || entry.libraryType === typeFilter;
+    return matchesQuery && matchesStatus && matchesType;
+  });
+  const pageSize = 24;
+  const pageCount = Math.max(1, Math.ceil(entries.length / pageSize));
+  ingestionPage = Math.min(Math.max(1, ingestionPage), pageCount);
+  const visibleEntries = entries.slice((ingestionPage - 1) * pageSize, ingestionPage * pageSize);
+  const statusCounts = knowledge.entries.reduce((counts, entry) => {
+    counts[entry.status] = (counts[entry.status] || 0) + 1;
+    return counts;
+  }, {});
+
+  dom.view.innerHTML = `
+    <section class="ingestion-header">
+      <div>
+        <p class="eyebrow">知识摄入中心</p>
+        <h2>导入专业资料</h2>
+      </div>
+      <div class="ingestion-header-status">
+        <span>${knowledge.sourceDocuments.length} 份来源</span>
+        <span>${knowledge.entries.length} 条知识</span>
+      </div>
+    </section>
+
+    <section class="ingestion-upload-tool" aria-label="上传知识资料">
+      <label class="ingestion-file-picker" for="ingestionFileInput">
+        <i data-lucide="file-up"></i>
+        <span id="ingestionFileName">选择 DOCX、TXT、MD、JSON 或 JSONL</span>
+        <input id="ingestionFileInput" type="file" accept=".docx,.txt,.md,.json,.jsonl" />
+      </label>
+      <label class="ingestion-target-field" for="ingestionTargetType">
+        <span>目标词库</span>
+        <select id="ingestionTargetType">
+          <option value="auto">自动识别</option>
+          <option value="source_only">仅登记来源</option>
+          ${knowledge.libraryDefinitions.map((definition) => `<option value="${escapeHtml(definition.id)}">${escapeHtml(definition.label)}</option>`).join("")}
+        </select>
+      </label>
+      <button class="primary-button ingestion-process-button" id="processIngestionBtn" type="button" ${ingestionBusy ? "disabled" : ""}>
+        <i data-lucide="${ingestionBusy ? "loader-circle" : "scan-text"}"></i>
+        ${ingestionBusy ? "正在解析" : "解析并加入审核队列"}
+      </button>
+    </section>
+
+    <section class="ingestion-stat-band" aria-label="知识状态统计">
+      ${renderIngestionStat("待审核", statusCounts.review || 0, "clipboard-check")}
+      ${renderIngestionStat("草稿", statusCounts.draft || 0, "file-pen-line")}
+      ${renderIngestionStat("已发布", statusCounts.published || 0, "badge-check")}
+      ${renderIngestionStat("已归档", statusCounts.archived || 0, "archive")}
+      ${renderIngestionStat("导入任务", knowledge.ingestionJobs.length, "list-checks")}
+    </section>
+
+    <section class="ingestion-review-section" aria-label="知识审核队列">
+      <div class="ingestion-section-head">
+        <div>
+          <p class="eyebrow">审核队列</p>
+          <h3>${entries.length} 条匹配</h3>
+        </div>
+        <div class="ingestion-batch-actions">
+          <span>${ingestionSelectedIds.size} 条已选</span>
+          <button class="ghost-button compact" type="button" id="mergeKnowledgeBtn" ${ingestionSelectedIds.size < 2 ? "disabled" : ""}><i data-lucide="combine"></i>合并</button>
+          <button class="ghost-button compact" type="button" data-batch-knowledge-status="published" ${ingestionSelectedIds.size ? "" : "disabled"}><i data-lucide="badge-check"></i>发布</button>
+          <button class="ghost-button compact" type="button" data-batch-knowledge-status="archived" ${ingestionSelectedIds.size ? "" : "disabled"}><i data-lucide="archive"></i>归档</button>
+          <button class="danger-button compact" type="button" id="deleteSelectedKnowledgeBtn" ${ingestionSelectedIds.size ? "" : "disabled"}><i data-lucide="trash-2"></i>删除</button>
+        </div>
+      </div>
+      <div class="ingestion-filter-bar">
+        <label class="module-search-field" for="ingestionSearchInput">
+          <i data-lucide="search"></i>
+          <input id="ingestionSearchInput" type="search" placeholder="搜索标题、内容、标签或来源" value="${escapeHtml(getTempFilter("ingestionSearch", ""))}" />
+        </label>
+        <select id="ingestionStatusFilter" aria-label="知识状态">
+          ${[["all", "全部状态"], ["review", "待审核"], ["draft", "草稿"], ["published", "已发布"], ["archived", "已归档"]].map(([value, label]) => `<option value="${value}" ${statusFilter === value ? "selected" : ""}>${label}</option>`).join("")}
+        </select>
+        <select id="ingestionTypeFilter" aria-label="词库类型">
+          <option value="all">全部词库</option>
+          ${knowledge.libraryDefinitions.map((definition) => `<option value="${escapeHtml(definition.id)}" ${typeFilter === definition.id ? "selected" : ""}>${escapeHtml(definition.label)}</option>`).join("")}
+        </select>
+      </div>
+      ${visibleEntries.length
+        ? `<div class="knowledge-review-grid">${visibleEntries.map(renderKnowledgeReviewCard).join("")}</div>`
+        : emptyState("当前筛选下没有知识词条", "上传资料或调整筛选条件。")}
+      ${pageCount > 1 ? renderIngestionPagination(pageCount) : ""}
+    </section>
+
+    <section class="ingestion-source-section" aria-label="最近导入来源">
+      <div class="ingestion-section-head">
+        <div><p class="eyebrow">来源记录</p><h3>最近导入</h3></div>
+      </div>
+      ${knowledge.sourceDocuments.length
+        ? `<div class="source-document-list">${knowledge.sourceDocuments.slice(0, 8).map(renderSourceDocumentRow).join("")}</div>`
+        : emptyState("还没有导入来源", "选择一份资料开始建立专业词库。")}
+    </section>
+  `;
+  bindIngestionEvents();
+}
+
+function renderIngestionStat(label, value, icon) {
+  return `<div><i data-lucide="${icon}"></i><span>${escapeHtml(label)}</span><strong>${Number(value) || 0}</strong></div>`;
+}
+
+function renderKnowledgeReviewCard(entry) {
+  const definition = getKnowledgeDefinition(entry.libraryType);
+  const source = getKnowledgeSource(entry.sourceDocumentId);
+  const selected = ingestionSelectedIds.has(entry.id);
+  const confidence = Math.round((Number(entry.confidence) || 0) * 100);
+  return `
+    <article class="knowledge-review-card ${selected ? "is-selected" : ""}">
+      <div class="knowledge-review-head">
+        <label class="knowledge-select-control">
+          <input type="checkbox" data-select-knowledge="${escapeHtml(entry.id)}" ${selected ? "checked" : ""} />
+          <span aria-hidden="true"></span>
+          <b>${escapeHtml(definition?.label || entry.libraryType)}</b>
+        </label>
+        <span class="knowledge-status status-${escapeHtml(entry.status)}">${escapeHtml(getKnowledgeStatusLabel(entry.status))}</span>
+      </div>
+      <h4>${escapeHtml(entry.title)}</h4>
+      <p class="knowledge-content-preview">${escapeHtml(entry.summary || entry.contentZh)}</p>
+      <div class="knowledge-review-meta">
+        <span><i data-lucide="gauge"></i>${confidence}%</span>
+        <span title="${escapeHtml(source?.fileName || "手动创建")}"><i data-lucide="file-text"></i>${escapeHtml(source?.fileName || "手动创建")}</span>
+        <span><i data-lucide="map-pin"></i>${escapeHtml(entry.sourceLocation || "未标注")}</span>
+      </div>
+      <div class="tag-list">${(entry.tags || []).slice(0, 6).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
+      <div class="knowledge-review-actions">
+        <button class="ghost-button compact" type="button" data-edit-knowledge="${escapeHtml(entry.id)}"><i data-lucide="pencil"></i>编辑</button>
+        <button class="ghost-button compact" type="button" data-split-knowledge="${escapeHtml(entry.id)}"><i data-lucide="split"></i>拆分</button>
+        ${entry.status === "published"
+          ? `<button class="ghost-button compact" type="button" data-knowledge-status="review" data-knowledge-id="${escapeHtml(entry.id)}"><i data-lucide="undo-2"></i>退回审核</button>`
+          : `<button class="primary-button compact" type="button" data-knowledge-status="published" data-knowledge-id="${escapeHtml(entry.id)}"><i data-lucide="badge-check"></i>发布</button>`}
+        <button class="danger-button compact" type="button" data-delete-knowledge="${escapeHtml(entry.id)}" aria-label="删除知识词条"><i data-lucide="trash-2"></i></button>
+      </div>
+    </article>
+  `;
+}
+
+function renderIngestionPagination(pageCount) {
+  return `
+    <div class="ingestion-pagination">
+      <button class="ghost-button compact" type="button" data-ingestion-page="${ingestionPage - 1}" ${ingestionPage <= 1 ? "disabled" : ""}><i data-lucide="chevron-left"></i>上一页</button>
+      <span>${ingestionPage} / ${pageCount}</span>
+      <button class="ghost-button compact" type="button" data-ingestion-page="${ingestionPage + 1}" ${ingestionPage >= pageCount ? "disabled" : ""}>下一页<i data-lucide="chevron-right"></i></button>
+    </div>
+  `;
+}
+
+function renderSourceDocumentRow(source) {
+  const job = state.knowledge.ingestionJobs.find((item) => item.sourceDocumentId === source.id);
+  return `
+    <div class="source-document-row">
+      <i data-lucide="file-text"></i>
+      <div><strong>${escapeHtml(source.fileName)}</strong><span>${escapeHtml(String(source.fileType || "file").toUpperCase())} / ${formatFileSize(source.fileSize)} / ${source.segmentCount || 0} 个片段</span></div>
+      <span>${escapeHtml(job?.status === "completed" ? `${job.entryCount || 0} 条入队` : "仅登记")}</span>
+      <time>${escapeHtml(formatDateTime(source.createdAt))}</time>
+    </div>
+  `;
+}
+
+function bindIngestionEvents() {
+  const fileInput = document.getElementById("ingestionFileInput");
+  fileInput?.addEventListener("change", () => {
+    const fileName = document.getElementById("ingestionFileName");
+    if (fileName) fileName.textContent = fileInput.files?.[0]?.name || "选择 DOCX、TXT、MD、JSON 或 JSONL";
+  });
+  document.getElementById("processIngestionBtn")?.addEventListener("click", processIngestionFile);
+  document.getElementById("ingestionSearchInput")?.addEventListener("input", (event) => {
+    setTempFilter("ingestionSearch", event.target.value);
+    window.clearTimeout(renderIngestion.searchTimer);
+    renderIngestion.searchTimer = window.setTimeout(() => {
+      ingestionPage = 1;
+      renderIngestion();
+      document.getElementById("ingestionSearchInput")?.focus();
+    }, 120);
+  });
+  document.getElementById("ingestionStatusFilter")?.addEventListener("change", (event) => {
+    setTempFilter("ingestionStatus", event.target.value);
+    ingestionPage = 1;
+    renderIngestion();
+  });
+  document.getElementById("ingestionTypeFilter")?.addEventListener("change", (event) => {
+    setTempFilter("ingestionType", event.target.value);
+    ingestionPage = 1;
+    renderIngestion();
+  });
+  document.querySelectorAll("[data-select-knowledge]").forEach((checkbox) => checkbox.addEventListener("change", () => {
+    if (checkbox.checked) ingestionSelectedIds.add(checkbox.dataset.selectKnowledge);
+    else ingestionSelectedIds.delete(checkbox.dataset.selectKnowledge);
+    renderIngestion();
+  }));
+  document.querySelectorAll("[data-edit-knowledge]").forEach((button) => button.addEventListener("click", () => openKnowledgeEntryModal(getKnowledgeEntry(button.dataset.editKnowledge))));
+  document.querySelectorAll("[data-split-knowledge]").forEach((button) => button.addEventListener("click", () => splitKnowledgeEntry(button.dataset.splitKnowledge)));
+  document.querySelectorAll("[data-knowledge-status]").forEach((button) => button.addEventListener("click", () => updateKnowledgeEntryStatus(button.dataset.knowledgeId, button.dataset.knowledgeStatus)));
+  document.querySelectorAll("[data-delete-knowledge]").forEach((button) => button.addEventListener("click", () => deleteKnowledgeEntries([button.dataset.deleteKnowledge])));
+  document.querySelectorAll("[data-batch-knowledge-status]").forEach((button) => button.addEventListener("click", () => batchUpdateKnowledgeStatus(button.dataset.batchKnowledgeStatus)));
+  document.getElementById("mergeKnowledgeBtn")?.addEventListener("click", mergeSelectedKnowledgeEntries);
+  document.getElementById("deleteSelectedKnowledgeBtn")?.addEventListener("click", () => deleteKnowledgeEntries([...ingestionSelectedIds]));
+  document.querySelectorAll("[data-ingestion-page]").forEach((button) => button.addEventListener("click", () => {
+    ingestionPage = Number(button.dataset.ingestionPage) || 1;
+    renderIngestion();
+    dom.view.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+}
+
+async function processIngestionFile() {
+  if (ingestionBusy) return;
+  const fileInput = document.getElementById("ingestionFileInput");
+  const targetType = document.getElementById("ingestionTargetType")?.value || "auto";
+  const file = fileInput?.files?.[0];
+  if (!file) {
+    showToast("请先选择需要导入的文件");
+    return;
+  }
+  ingestionBusy = true;
+  renderIngestion();
+  const previousKnowledge = clone(state.knowledge);
+  try {
+    const parsed = await KNOWLEDGE_INGESTION.parseFile(file, window.mammoth);
+    const duplicateSource = state.knowledge.sourceDocuments.find((source) => source.contentFingerprint === parsed.textFingerprint);
+    if (duplicateSource) throw new Error(`该文件内容已于 ${formatDateTime(duplicateSource.createdAt)} 导入。`);
+    const now = new Date().toISOString();
+    const sourceDocument = {
+      id: createId("source"),
+      fileName: file.name,
+      fileType: parsed.extension,
+      fileSize: Number(file.size) || 0,
+      lastModified: file.lastModified ? new Date(file.lastModified).toISOString() : "",
+      contentFingerprint: parsed.textFingerprint,
+      textLength: parsed.textLength,
+      excerpt: parsed.excerpt,
+      segmentCount: parsed.segments.length,
+      warnings: parsed.warnings,
+      createdAt: now,
+    };
+    const draftResult = targetType === "source_only"
+      ? { entries: [], duplicateCount: 0 }
+      : KNOWLEDGE_INGESTION.buildDraftEntries(parsed.segments, {
+          sourceDocumentId: sourceDocument.id,
+          targetType,
+          existingEntries: state.knowledge.entries,
+        });
+    const ingestionJob = {
+      id: createId("ingestion-job"),
+      sourceDocumentId: sourceDocument.id,
+      fileName: file.name,
+      targetType,
+      status: "completed",
+      segmentCount: parsed.segments.length,
+      entryCount: draftResult.entries.length,
+      duplicateCount: draftResult.duplicateCount,
+      warnings: parsed.warnings,
+      createdAt: now,
+      completedAt: now,
+    };
+    state.knowledge.sourceDocuments.unshift(sourceDocument);
+    state.knowledge.ingestionJobs.unshift(ingestionJob);
+    state.knowledge.entries.unshift(...draftResult.entries);
+    const projectedSize = JSON.stringify(state).length;
+    if (projectedSize > 4_500_000) {
+      throw new Error("本地知识库容量接近浏览器上限，请先导出备份并拆分文件，或进入云数据库阶段。");
+    }
+    saveState();
+    ingestionSelectedIds = new Set(draftResult.entries.map((entry) => entry.id));
+    setTempFilter("ingestionStatus", draftResult.entries.length ? "review" : "all");
+    ingestionPage = 1;
+    const duplicateText = draftResult.duplicateCount ? `，跳过 ${draftResult.duplicateCount} 条重复内容` : "";
+    showToast(`已生成 ${draftResult.entries.length} 条待审核知识${duplicateText}`);
+  } catch (error) {
+    state.knowledge = previousKnowledge;
+    console.warn(error);
+    showToast(error.message || "文件解析失败");
+  } finally {
+    ingestionBusy = false;
+    renderIngestion();
+  }
+}
+
+function recordKnowledgeEntryVersion(entry, changeType) {
+  if (!entry) return;
+  state.knowledge.entryVersions.unshift({
+    id: createId("knowledge-version"),
+    knowledgeEntryId: entry.id,
+    version: entry.version || 1,
+    changeType,
+    snapshot: clone(entry),
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function updateKnowledgeEntryStatus(id, status, options = {}) {
+  const entry = getKnowledgeEntry(id);
+  if (!entry || !KNOWLEDGE_CORE.ENTRY_STATUSES.includes(status)) return;
+  recordKnowledgeEntryVersion(entry, `status:${entry.status}->${status}`);
+  entry.status = status;
+  entry.version = (Number(entry.version) || 1) + 1;
+  entry.updatedAt = new Date().toISOString();
+  entry.publishedAt = status === "published" ? entry.publishedAt || entry.updatedAt : "";
+  if (status !== "published") {
+    state.workbench.selectedKnowledgeEntryIds = (state.workbench.selectedKnowledgeEntryIds || []).filter((entryId) => entryId !== id);
+    state.workbench.lockedRecallIds = (state.workbench.lockedRecallIds || []).filter((recallId) => recallId !== `knowledge-entry:${id}`);
+  }
+  if (!options.defer) {
+    saveState();
+    renderIngestion();
+    showToast(status === "published" ? "知识词条已发布" : "知识状态已更新");
+  }
+}
+
+function batchUpdateKnowledgeStatus(status) {
+  const ids = [...ingestionSelectedIds].filter((id) => getKnowledgeEntry(id));
+  if (!ids.length) return;
+  ids.forEach((id) => updateKnowledgeEntryStatus(id, status, { defer: true }));
+  ingestionSelectedIds.clear();
+  saveState();
+  renderIngestion();
+  showToast(`已更新 ${ids.length} 条知识`);
+}
+
+function deleteKnowledgeEntries(ids) {
+  const validIds = [...new Set(ids)].filter((id) => getKnowledgeEntry(id));
+  if (!validIds.length) return;
+  const ok = confirm(`确认删除 ${validIds.length} 条知识词条吗？来源记录和历史版本会保留。`);
+  if (!ok) return;
+  const idSet = new Set(validIds);
+  validIds.forEach((id) => recordKnowledgeEntryVersion(getKnowledgeEntry(id), "deleted"));
+  state.knowledge.entries = state.knowledge.entries.filter((entry) => !idSet.has(entry.id));
+  state.workbench.selectedKnowledgeEntryIds = (state.workbench.selectedKnowledgeEntryIds || []).filter((id) => !idSet.has(id));
+  state.workbench.lockedRecallIds = (state.workbench.lockedRecallIds || []).filter((recallId) => !validIds.some((id) => recallId === `knowledge-entry:${id}`));
+  validIds.forEach((id) => ingestionSelectedIds.delete(id));
+  saveState();
+  renderIngestion();
+  showToast("知识词条已删除");
+}
+
+function splitKnowledgeEntry(id) {
+  const entry = getKnowledgeEntry(id);
+  if (!entry) return;
+  let parts = entry.contentZh.split(/\n\s*\n/g).map((item) => item.trim()).filter(Boolean);
+  if (parts.length < 2) {
+    const sentences = entry.contentZh.split(/(?<=[。！？!?；;])\s*/).filter(Boolean);
+    if (sentences.length < 2) {
+      showToast("内容太短，无法自动拆分");
+      return;
+    }
+    const middle = Math.ceil(sentences.length / 2);
+    parts = [sentences.slice(0, middle).join(""), sentences.slice(middle).join("")];
+  }
+  recordKnowledgeEntryVersion(entry, "split");
+  entry.status = "archived";
+  entry.updatedAt = new Date().toISOString();
+  const created = parts.map((content, index) => KNOWLEDGE_CORE.createEntry({
+    ...entry,
+    id: createId("knowledge"),
+    title: `${entry.title} ${index + 1}`,
+    summary: content.replace(/\s+/g, " ").slice(0, 140),
+    contentZh: content,
+    status: "review",
+    version: 1,
+    publishedAt: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    structuredData: { ...entry.structuredData, splitFrom: entry.id, splitIndex: index },
+  }));
+  state.knowledge.entries.unshift(...created);
+  saveState();
+  renderIngestion();
+  showToast(`已拆分为 ${created.length} 条待审核知识`);
+}
+
+function mergeSelectedKnowledgeEntries() {
+  const entries = [...ingestionSelectedIds].map(getKnowledgeEntry).filter(Boolean);
+  if (entries.length < 2) return;
+  const ok = confirm(`确认合并选中的 ${entries.length} 条知识吗？原词条会归档。`);
+  if (!ok) return;
+  entries.forEach((entry) => {
+    recordKnowledgeEntryVersion(entry, "merged");
+    entry.status = "archived";
+    entry.updatedAt = new Date().toISOString();
+  });
+  const first = entries[0];
+  const merged = KNOWLEDGE_CORE.createEntry({
+    libraryType: first.libraryType,
+    title: `${first.title} 等 ${entries.length} 条合并`,
+    summary: entries.map((entry) => entry.summary).filter(Boolean).join("；").slice(0, 140),
+    contentZh: entries.map((entry) => entry.contentZh).join("\n\n"),
+    contentEn: entries.map((entry) => entry.contentEn).filter(Boolean).join("\n\n"),
+    tags: unique(entries.flatMap((entry) => entry.tags || [])),
+    scenarios: unique(entries.flatMap((entry) => entry.scenarios || [])),
+    structuredData: { mergedFrom: entries.map((entry) => entry.id) },
+    sourceDocumentId: first.sourceDocumentId,
+    sourceLocation: entries.map((entry) => entry.sourceLocation).filter(Boolean).join("；"),
+    confidence: Math.min(...entries.map((entry) => Number(entry.confidence) || 0)),
+    status: "review",
+  });
+  state.knowledge.entries.unshift(merged);
+  ingestionSelectedIds = new Set([merged.id]);
+  saveState();
+  renderIngestion();
+  showToast("已合并为新的待审核知识");
+}
+
+function openKnowledgeEntryModal(entry) {
+  if (!entry) return;
+  modalMode = "knowledgeEntry";
+  modalEditingId = entry.id;
+  dom.modalEyebrow.textContent = "专业知识词条";
+  dom.modalTitle.textContent = `审核 ${entry.title}`;
+  const source = getKnowledgeSource(entry.sourceDocumentId);
+  dom.modalBody.innerHTML = `
+    <section class="form-section">
+      <h3>基础信息</h3>
+      <div class="field-grid two-col">
+        ${inputField("title", "词条标题", entry.title)}
+        <div class="field">
+          <label for="field-libraryType">目标词库</label>
+          <select name="libraryType" id="field-libraryType">${state.knowledge.libraryDefinitions.map((definition) => `<option value="${escapeHtml(definition.id)}" ${definition.id === entry.libraryType ? "selected" : ""}>${escapeHtml(definition.label)}</option>`).join("")}</select>
+        </div>
+        <div class="field">
+          <label for="field-status">状态</label>
+          <select name="status" id="field-status">${KNOWLEDGE_CORE.ENTRY_STATUSES.map((status) => `<option value="${status}" ${status === entry.status ? "selected" : ""}>${getKnowledgeStatusLabel(status)}</option>`).join("")}</select>
+        </div>
+        ${inputField("confidence", "识别置信度（0-1）", entry.confidence, "number")}
+      </div>
+      ${textareaField("summary", "摘要", entry.summary)}
+      ${textareaField("contentZh", "中文内容", entry.contentZh)}
+      ${textareaField("contentEn", "英文内容", entry.contentEn)}
+      <div class="field-grid two-col">
+        ${inputField("tags", "标签，用逗号分隔", (entry.tags || []).join(", "))}
+        ${inputField("scenarios", "适用场景，用逗号分隔", (entry.scenarios || []).join(", "))}
+      </div>
+      ${textareaField("notes", "审核备注", entry.notes)}
+    </section>
+    <section class="form-section knowledge-source-snapshot">
+      <h3>来源追溯</h3>
+      <p><strong>${escapeHtml(source?.fileName || "手动创建")}</strong><span>${escapeHtml(entry.sourceLocation || "未标注位置")}</span></p>
+      <small>${escapeHtml(entry.structuredData?.ingestion?.classificationReason || "人工创建或未记录分类原因")}</small>
+    </section>
+  `;
+  const confidenceInput = dom.modalBody.querySelector('[name="confidence"]');
+  if (confidenceInput) {
+    confidenceInput.min = "0";
+    confidenceInput.max = "1";
+    confidenceInput.step = "0.01";
+  }
+  openModal();
+}
+
+function saveKnowledgeEntry(data) {
+  const existing = getKnowledgeEntry(modalEditingId);
+  if (!existing) return;
+  recordKnowledgeEntryVersion(existing, "edited");
+  const updated = KNOWLEDGE_CORE.createEntry({
+    ...existing,
+    ...data,
+    id: existing.id,
+    tags: parseTags(data.tags),
+    scenarios: parseTags(data.scenarios),
+    confidence: Number(data.confidence) || 0,
+    version: (Number(existing.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    publishedAt: data.status === "published" ? existing.publishedAt || new Date().toISOString() : "",
+  });
+  upsert(state.knowledge.entries, updated);
+  if (updated.status !== "published") {
+    state.workbench.selectedKnowledgeEntryIds = (state.workbench.selectedKnowledgeEntryIds || []).filter((id) => id !== updated.id);
+    state.workbench.lockedRecallIds = (state.workbench.lockedRecallIds || []).filter((id) => id !== `knowledge-entry:${updated.id}`);
+  }
+  addTags(updated.tags);
+}
+
+function getKnowledgeDefinition(id) {
+  return state.knowledge.libraryDefinitions.find((item) => item.id === id)
+    || state.knowledge.libraryDefinitions.find((item) => item.id === "uncategorized");
+}
+
+function getKnowledgeSource(id) {
+  return state.knowledge.sourceDocuments.find((item) => item.id === id);
+}
+
+function getKnowledgeStatusLabel(status) {
+  return { draft: "草稿", review: "待审核", published: "已发布", archived: "已归档" }[status] || status;
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
 function getFilteredModules() {
   const globalQuery = currentQuery();
   const moduleQuery = getTempFilter("moduleSearch", "").trim().toLowerCase();
@@ -3908,6 +4419,7 @@ function handleModalSubmit(event) {
   if (modalMode === "model") saveModel(data);
   if (modalMode === "project") saveProject(data);
   if (modalMode === "moduleQuickTypes") saveModuleQuickTypes(formData);
+  if (modalMode === "knowledgeEntry") saveKnowledgeEntry(data);
   closeModal();
   saveState();
   render();

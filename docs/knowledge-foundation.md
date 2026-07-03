@@ -52,6 +52,24 @@ knowledge
 
 ```powershell
 node tests/knowledge-foundation.test.js
+node tests/knowledge-ingestion.test.js
 ```
 
 测试覆盖旧数据迁移、默认词库合并、发布状态过滤、统一召回、锁定、加入当前提示词和自定义词库注册。
+
+## 知识摄入中心
+
+支持 `DOCX`、`TXT`、`MD`、`JSON` 和 `JSONL`。DOCX通过Mammoth的 `extractRawText()` 在浏览器中读取纯文本，不渲染文档HTML；原始二进制文件不会进入 localStorage。
+
+导入流程：
+
+```text
+文件解析 → 内容切分 → 本地规则分类 → 精确去重 → 待审核 → 人工编辑 → 发布召回
+```
+
+- 单文件上限8MB，单次最多生成1200个片段。
+- 来源记录保存文件名、格式、大小、文本指纹、片段数量和解析警告。
+- 每条知识保留来源文件ID和段落/镜头位置。
+- 重复文件按全文指纹阻止再次导入，重复词条按正文指纹跳过。
+- 拆分和合并不会直接删除原词条，原内容转为归档并写入版本记录。
+- 本地数据接近4.5MB时停止写入，避免超过常见浏览器 localStorage 配额。

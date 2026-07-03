@@ -2362,6 +2362,356 @@ button.chip.is-selected,
   font-weight: 680;
 }
 
+.ingestion-header,
+.ingestion-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ingestion-header {
+  margin-bottom: 18px;
+}
+
+.ingestion-header h2,
+.ingestion-section-head h3 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+.ingestion-header-status,
+.ingestion-batch-actions,
+.knowledge-review-meta,
+.knowledge-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ingestion-header-status span,
+.ingestion-batch-actions > span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.ingestion-upload-tool {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(180px, 260px) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 14px 42px rgba(30, 27, 37, 0.06);
+}
+
+.ingestion-file-picker {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 52px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent-soft) 44%, var(--surface));
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ingestion-file-picker:hover {
+  border-color: var(--accent);
+}
+
+.ingestion-file-picker svg {
+  width: 19px;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.ingestion-file-picker span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ingestion-file-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ingestion-target-field {
+  display: grid;
+  gap: 6px;
+}
+
+.ingestion-target-field span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.ingestion-target-field select,
+.ingestion-process-button {
+  min-height: 52px;
+}
+
+.ingestion-stat-band {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 22px;
+  overflow: hidden;
+  border-block: 1px solid var(--line);
+}
+
+.ingestion-stat-band > div {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 14px;
+  border-right: 1px solid var(--line);
+}
+
+.ingestion-stat-band > div:last-child {
+  border-right: 0;
+}
+
+.ingestion-stat-band svg {
+  width: 17px;
+  color: var(--accent);
+}
+
+.ingestion-stat-band span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ingestion-stat-band strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.ingestion-review-section,
+.ingestion-source-section {
+  margin-top: 22px;
+}
+
+.ingestion-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(150px, 210px) minmax(170px, 240px);
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.knowledge-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.knowledge-review-card {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.knowledge-review-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.knowledge-review-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.knowledge-select-control {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.knowledge-select-control input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--accent);
+}
+
+.knowledge-select-control b {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-status {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.knowledge-status.status-published {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.knowledge-status.status-archived {
+  opacity: 0.62;
+}
+
+.knowledge-review-card h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.knowledge-content-preview {
+  display: -webkit-box;
+  min-height: 3.1em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.knowledge-review-meta {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.knowledge-review-meta span {
+  display: inline-flex;
+  max-width: 42%;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-review-meta svg {
+  width: 13px;
+  flex: 0 0 auto;
+}
+
+.knowledge-review-actions {
+  padding-top: 2px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.knowledge-review-actions button:last-child {
+  margin-left: auto;
+}
+
+.ingestion-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 18px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.source-document-list {
+  margin-top: 12px;
+  border-block: 1px solid var(--line);
+}
+
+.source-document-row {
+  display: grid;
+  grid-template-columns: 24px minmax(220px, 1fr) minmax(90px, auto) minmax(130px, auto);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.source-document-row:last-child {
+  border-bottom: 0;
+}
+
+.source-document-row > svg {
+  width: 18px;
+  color: var(--accent);
+}
+
+.source-document-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.source-document-row strong,
+.source-document-row span,
+.source-document-row time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-document-row strong {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.source-document-row span,
+.source-document-row time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.knowledge-source-snapshot p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.knowledge-source-snapshot span,
+.knowledge-source-snapshot small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .module-filter-bar {
   display: grid;
   grid-template-columns: minmax(260px, 420px) minmax(0, 1fr) 40px;
@@ -2934,6 +3284,19 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .ingestion-upload-tool,
+  .ingestion-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ingestion-file-picker {
+    grid-column: 1 / -1;
+  }
+
+  .knowledge-review-grid {
+    grid-template-columns: 1fr;
+  }
+
   .module-search-field {
     grid-column: 1 / -1;
   }
@@ -3093,6 +3456,51 @@ tr:last-child td {
 
   .knowledge-foundation-strip dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ingestion-header,
+  .ingestion-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ingestion-upload-tool,
+  .ingestion-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .ingestion-file-picker {
+    grid-column: auto;
+  }
+
+  .ingestion-stat-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ingestion-stat-band > div {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ingestion-batch-actions {
+    width: 100%;
+  }
+
+  .source-document-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .source-document-row > span,
+  .source-document-row > time {
+    grid-column: 2;
+  }
+
+  .knowledge-review-actions button {
+    flex: 1 1 auto;
+  }
+
+  .knowledge-review-actions button:last-child {
+    flex: 0 0 42px;
+    margin-left: 0;
   }
 
   .mode-switcher,
