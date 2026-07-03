@@ -53,6 +53,18 @@ const AI_BREAKDOWN_SECTIONS = [
   { id: "negative", label: "负面约束", icon: "shield-x", target: "customNegative" },
 ];
 
+const RESULT_CARD_TYPES = [
+  { id: "projectStyle", label: "项目风格", icon: "folder-kanban", moduleType: "style" },
+  { id: "sceneSpace", label: "场景空间", icon: "map", moduleType: "scene" },
+  { id: "lightingMood", label: "光影氛围", icon: "lightbulb", moduleType: "lighting" },
+  { id: "cameraParams", label: "相机参数", icon: "camera", moduleType: "camera" },
+  { id: "action", label: "人物动作", icon: "move-3d", moduleType: "action" },
+  { id: "microExpression", label: "微表情", icon: "sparkles", moduleType: "expression" },
+  { id: "lensLanguage", label: "镜头语言", icon: "scan-eye", moduleType: "camera" },
+  { id: "texture", label: "画面质感", icon: "image", moduleType: "texture" },
+  { id: "negative", label: "负面提示词", icon: "shield-x", moduleType: "negative" },
+];
+
 const GOAL_OPTIONS = [
   "人物登场",
   "情绪爆发",
@@ -271,6 +283,10 @@ const DEFAULT_STATE = {
       selectedOptionIds: {},
       customValues: {},
       cards: [],
+    },
+    resultCards: {
+      lockedIds: [],
+      cards: {},
     },
     selectedModuleIds: {
       scene: "module-scene-window",
@@ -939,6 +955,12 @@ function mergeState(base, saved) {
         customValues: { ...base.workbench.aiBreakdown.customValues, ...(savedWorkbench.aiBreakdown?.customValues || {}) },
         cards: Array.isArray(savedWorkbench.aiBreakdown?.cards) ? savedWorkbench.aiBreakdown.cards : base.workbench.aiBreakdown.cards,
       },
+      resultCards: {
+        ...base.workbench.resultCards,
+        ...(savedWorkbench.resultCards || {}),
+        lockedIds: Array.isArray(savedWorkbench.resultCards?.lockedIds) ? savedWorkbench.resultCards.lockedIds : base.workbench.resultCards.lockedIds,
+        cards: { ...base.workbench.resultCards.cards, ...(savedWorkbench.resultCards?.cards || {}) },
+      },
     },
     roles: mergeById(base.roles, saved.roles),
     modules: mergeById(base.modules, saved.modules),
@@ -1085,7 +1107,6 @@ function renderWorkbench() {
       <section class="simple-generator">
         <h2>AI短视频提示词生成器</h2>
         <textarea id="wbSourceBrief" class="simple-main-input" data-workbench-field="sourceBrief" placeholder="输入你的主要想法、剧情片段或画面需求...">${escapeHtml(wb.sourceBrief || "")}</textarea>
-        <textarea id="resultText" class="simple-result-input" placeholder="/ 提示词结果：">${escapeHtml(wb.results[state.resultTab] || "")}</textarea>
         <div class="simple-action-row">
           <button class="pf-button pf-primary" type="button" id="copyResultBtn">
             <i data-lucide="copy"></i>
@@ -1104,6 +1125,7 @@ function renderWorkbench() {
             优化提示词
           </button>
         </div>
+        ${renderModularResultEditor()}
         ${renderSmartRecallPanel(getSmartRecallEntries())}
         ${renderAiBreakdownPanel()}
         <section class="simple-params-card">
@@ -1301,6 +1323,68 @@ function renderAiBreakdownCard(card) {
         `).join("")}
       </div>
       <textarea class="breakdown-edit" data-breakdown-edit="${escapeHtml(card.id)}" rows="4">${escapeHtml(currentValue)}</textarea>
+    </article>
+  `;
+}
+
+function renderModularResultEditor() {
+  const wb = state.workbench;
+  const cards = getOrderedResultCards();
+  const result = wb.results?.[state.resultTab] || "";
+  return `
+    <section class="modular-result-editor" aria-label="模块化结果编辑器">
+      <div class="modular-result-head">
+        <div>
+          <p class="eyebrow">生成结果</p>
+          <h3>模块化结果编辑器</h3>
+          <span>编辑、锁定或保存单张卡片；底部会自动组合成完整提示词。</span>
+        </div>
+        <span>${cards.length} 个模块 / ${getResultCardState().lockedIds.length} 个已锁定</span>
+      </div>
+      <div class="result-card-grid">
+        ${cards.map(renderResultModuleCard).join("")}
+      </div>
+      <div class="complete-prompt-panel">
+        <div class="complete-prompt-head">
+          <div>
+            <p class="eyebrow">完整提示词</p>
+            <h3>卡片组合结果</h3>
+          </div>
+          <div class="result-tabs">
+            ${[
+              ["zh", "中文"],
+              ["en", "英文"],
+              ["negative", "负面"],
+              ["json", "JSON"],
+            ].map(([id, label]) => `<button class="result-tab ${state.resultTab === id ? "is-active" : ""}" type="button" data-result-tab="${id}">${label}</button>`).join("")}
+          </div>
+        </div>
+        <textarea id="resultText" class="complete-prompt-text" placeholder="完整提示词会由上方卡片自动组合。">${escapeHtml(result)}</textarea>
+      </div>
+    </section>
+  `;
+}
+
+function renderResultModuleCard(card) {
+  const cardType = RESULT_CARD_TYPES.find((item) => item.id === card.id) || card;
+  const locked = getResultCardState().lockedIds.includes(card.id);
+  return `
+    <article class="result-module-card ${locked ? "is-locked" : ""}">
+      <div class="result-module-card-head">
+        <span><i data-lucide="${cardType.icon || "square"}"></i>${escapeHtml(cardType.label || card.label)}</span>
+        <button class="icon-button result-lock-button" type="button" data-result-card-lock="${escapeHtml(card.id)}" aria-label="${locked ? "取消锁定" : "锁定"}">
+          <i data-lucide="${locked ? "lock" : "unlock"}"></i>
+        </button>
+      </div>
+      <textarea class="result-card-edit" data-result-card-edit="${escapeHtml(card.id)}" rows="5">${escapeHtml(card.zh || "")}</textarea>
+      <div class="result-module-actions">
+        <button class="ghost-button compact" type="button" data-result-card-copy="${escapeHtml(card.id)}">
+          <i data-lucide="copy"></i>复制
+        </button>
+        <button class="ghost-button compact" type="button" data-result-card-save="${escapeHtml(card.id)}">
+          <i data-lucide="database"></i>保存词条
+        </button>
+      </div>
     </article>
   `;
 }
@@ -1811,6 +1895,35 @@ function bindWorkbenchEvents() {
     textarea.addEventListener("input", (event) => {
       updateAiBreakdownValue(event.target.dataset.breakdownEdit, event.target.value);
       regenerateResults();
+    });
+  });
+
+  document.querySelectorAll("[data-result-card-edit]").forEach((textarea) => {
+    textarea.addEventListener("input", (event) => {
+      updateResultCardValue(event.target.dataset.resultCardEdit, event.target.value);
+      regenerateResults({ preserveCards: true });
+    });
+  });
+
+  document.querySelectorAll("[data-result-card-lock]").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleResultCardLock(button.dataset.resultCardLock);
+      regenerateResults({ preserveCards: true });
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
+
+  document.querySelectorAll("[data-result-card-copy]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const card = getResultCard(button.dataset.resultCardCopy);
+      copyText(card?.zh || "");
+    });
+  });
+
+  document.querySelectorAll("[data-result-card-save]").forEach((button) => {
+    button.addEventListener("click", () => {
+      saveResultCardAsModule(button.dataset.resultCardSave);
     });
   });
 
@@ -2442,20 +2555,193 @@ function getAiBreakdownForJson() {
   });
 }
 
+function getResultCardState() {
+  const wb = state.workbench;
+  if (!wb.resultCards) wb.resultCards = clone(DEFAULT_STATE.workbench.resultCards);
+  wb.resultCards.lockedIds = Array.isArray(wb.resultCards.lockedIds) ? wb.resultCards.lockedIds : [];
+  wb.resultCards.cards = wb.resultCards.cards || {};
+  return wb.resultCards;
+}
+
+function getOrderedResultCards() {
+  const resultState = getResultCardState();
+  return RESULT_CARD_TYPES.map((type) => resultState.cards[type.id] || createEmptyResultCard(type));
+}
+
+function getResultCard(id) {
+  return getResultCardState().cards[id];
+}
+
+function createEmptyResultCard(type) {
+  return {
+    id: type.id,
+    label: type.label,
+    moduleType: type.moduleType,
+    zh: "",
+    en: "",
+    updatedAt: "",
+  };
+}
+
+function syncResultCards(proposedCards, options = {}) {
+  const resultState = getResultCardState();
+  const locked = new Set(resultState.lockedIds || []);
+  proposedCards.forEach((card) => {
+    const existing = resultState.cards[card.id];
+    const shouldKeepExisting = existing && (locked.has(card.id) || options.preserveCards);
+    resultState.cards[card.id] = shouldKeepExisting
+      ? { ...card, ...existing, label: card.label, moduleType: card.moduleType }
+      : card;
+  });
+  return getOrderedResultCards();
+}
+
+function updateResultCardValue(cardId, value) {
+  const resultState = getResultCardState();
+  const type = RESULT_CARD_TYPES.find((item) => item.id === cardId);
+  if (!type) return;
+  const existing = resultState.cards[cardId] || createEmptyResultCard(type);
+  resultState.cards[cardId] = {
+    ...existing,
+    zh: value,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function toggleResultCardLock(cardId) {
+  const resultState = getResultCardState();
+  resultState.lockedIds = resultState.lockedIds.includes(cardId)
+    ? resultState.lockedIds.filter((id) => id !== cardId)
+    : [...resultState.lockedIds, cardId];
+  saveState();
+}
+
+function saveResultCardAsModule(cardId) {
+  const card = getResultCard(cardId);
+  const type = RESULT_CARD_TYPES.find((item) => item.id === cardId);
+  if (!card || !type || !card.zh?.trim()) {
+    showToast("当前卡片没有可保存的内容");
+    return;
+  }
+  const module = {
+    id: createId("module"),
+    name: `${type.label} ${versionLabel()}`,
+    type: type.moduleType,
+    zh: card.zh.trim(),
+    en: card.en || card.zh.trim(),
+    tags: unique([type.label, "模块化结果", state.workbench.promptType, state.workbench.goal].filter(Boolean)),
+    scenarios: state.workbench.sourceBrief || state.workbench.sceneGoal || "工作台生成结果",
+    favorite: true,
+    uses: 0,
+    notes: "由工作台模块化结果编辑器保存。",
+    updatedAt: today(),
+  };
+  state.modules.unshift(module);
+  addTags(module.tags);
+  saveState();
+  showToast("已保存为存储词条");
+}
+
+function buildResultCards(payload) {
+  const { projectZh, projectEn, negative, parameterLines, role, project, wb } = payload;
+  const sceneValue = getSelectedAiBreakdownValue("sceneSpace") || wb.frameDescription || wb.sceneGoal || "请补充场景空间。";
+  const lightingValue = getSelectedAiBreakdownValue("lightingMood") || wb.lightingControl || wb.sceneGoal || project?.lightingPreference || "请补充光影氛围。";
+  const cameraValue = getSelectedAiBreakdownValue("cameraParams") || parameterLines.join("\n");
+  const actionValue = getSelectedAiBreakdownValue("action") || wb.actionDetail || wb.action || role?.actions || "请补充人物动作。";
+  const expressionValue = getSelectedAiBreakdownValue("microExpression") || wb.expressionDetail || role?.anger || "请补充微表情。";
+  const lensValue = getSelectedAiBreakdownValue("cameraMotion") || project?.lensLanguage || [wb.shotSize, wb.cameraAngle, wb.composition, wb.cameraSpeed].filter(Boolean).join(" / ");
+  const textureValue = getSelectedAiBreakdownValue("texture") || project?.characterTexture || wb.texture || "请补充画面质感。";
+  const negativeValue = getSelectedAiBreakdownValue("negative") || negative;
+  const cards = {
+    projectStyle: {
+      zh: projectZh,
+      en: projectEn,
+    },
+    sceneSpace: {
+      zh: sceneValue,
+      en: sceneValue,
+    },
+    lightingMood: {
+      zh: lightingValue,
+      en: lightingValue,
+    },
+    cameraParams: {
+      zh: cameraValue,
+      en: cameraValue,
+    },
+    action: {
+      zh: actionValue,
+      en: actionValue,
+    },
+    microExpression: {
+      zh: expressionValue,
+      en: expressionValue,
+    },
+    lensLanguage: {
+      zh: lensValue || "请补充镜头语言。",
+      en: lensValue || "Please add lens language.",
+    },
+    texture: {
+      zh: textureValue,
+      en: textureValue,
+    },
+    negative: {
+      zh: negativeValue,
+      en: negativeValue,
+    },
+  };
+  return RESULT_CARD_TYPES.map((type) => ({
+    id: type.id,
+    label: type.label,
+    moduleType: type.moduleType,
+    zh: cards[type.id]?.zh || "",
+    en: cards[type.id]?.en || cards[type.id]?.zh || "",
+    updatedAt: new Date().toISOString(),
+  }));
+}
+
+function renderCardsAsPrompt(cards, language = "zh") {
+  return cards.map((card) => {
+    const label = card.label || RESULT_CARD_TYPES.find((type) => type.id === card.id)?.label || card.id;
+    const value = language === "en" ? card.en || card.zh : card.zh || card.en;
+    return language === "en" ? `[${label}]\n${value || "Not set."}` : `【${label}】\n${value || "未设置。"}`;
+  }).join("\n\n");
+}
+
+function buildResultCardsJson(cards, meta) {
+  return JSON.stringify(
+    {
+      ...meta,
+      resultCards: cards.map((card) => ({
+        id: card.id,
+        label: card.label,
+        moduleType: card.moduleType,
+        locked: getResultCardState().lockedIds.includes(card.id),
+        zh: card.zh,
+        en: card.en,
+        updatedAt: card.updatedAt,
+      })),
+    },
+    null,
+    2
+  );
+}
+
 function ensureWorkbenchResults() {
-  if (!state.workbench.results || !state.workbench.results.zh) {
+  const hasResultCards = Object.keys(getResultCardState().cards || {}).length > 0;
+  if (!state.workbench.results || !state.workbench.results.zh || !hasResultCards) {
     regenerateResults();
   }
 }
 
-function regenerateResults() {
-  state.workbench.results = composePrompt();
+function regenerateResults(options = {}) {
+  state.workbench.results = composePrompt(options);
   saveState();
   const textarea = document.getElementById("resultText");
   if (textarea) textarea.value = state.workbench.results[state.resultTab] || "";
 }
 
-function composePrompt() {
+function composePrompt(options = {}) {
   const wb = state.workbench;
   const role = getRole(wb.roleId);
   const project = getActiveProject();
@@ -2743,7 +3029,32 @@ function composePrompt() {
     2
   );
 
-  return { zh, en, negative, json };
+  const proposedCards = buildResultCards({
+    projectZh,
+    projectEn,
+    negative,
+    parameterLines,
+    role,
+    project,
+    wb,
+  });
+  const resultCards = syncResultCards(proposedCards, { preserveCards: Boolean(options.preserveCards) });
+  const modularZh = renderCardsAsPrompt(resultCards, "zh");
+  const modularEn = renderCardsAsPrompt(resultCards, "en");
+  const modularNegative = getResultCard("negative")?.zh || negative;
+  const modularJson = buildResultCardsJson(resultCards, {
+    mode: wb.mode,
+    modeLabel: mode.label,
+    task,
+    promptType: wb.promptType,
+    targetTool: wb.targetTool,
+    outputFormat: wb.outputFormat,
+    sourceBrief: wb.sourceBrief,
+    lockedCardIds: getResultCardState().lockedIds,
+    contextSnapshot: JSON.parse(json),
+  });
+
+  return { zh: modularZh, en: modularEn, negative: modularNegative, json: modularJson };
 }
 
 function renderProjectStyleMaster(project, language = "zh") {
@@ -3644,7 +3955,7 @@ function deleteActiveProject() {
 }
 
 function saveCurrentPreset() {
-  regenerateResults();
+  regenerateResults({ preserveCards: true });
   const wb = state.workbench;
   const role = getRole(wb.roleId);
   const titleBase = role ? `${role.name}${wb.goal || wb.promptType}` : wb.goal || wb.promptType;
@@ -3682,7 +3993,7 @@ function saveCurrentPreset() {
 }
 
 function saveCurrentVersion() {
-  regenerateResults();
+  regenerateResults({ preserveCards: true });
   const wb = state.workbench;
   let preset = getPreset(wb.lastSavedPresetId);
   if (!preset) {
