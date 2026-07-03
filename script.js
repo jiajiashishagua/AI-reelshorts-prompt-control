@@ -1,4 +1,9 @@
 const STORAGE_KEY = "ai_reelshorts_prompt_control_v1";
+const KNOWLEDGE_CORE = window.KnowledgeCore;
+
+if (!KNOWLEDGE_CORE) {
+  throw new Error("知识库核心未加载，请刷新页面后重试。");
+}
 
 const NAV_ITEMS = [
   { id: "workbench", label: "工作台", icon: "wand-sparkles", title: "提示词创建工作台" },
@@ -277,6 +282,7 @@ const DEFAULT_STATE = {
     customNegative: "",
     optimizationNotes: [],
     lockedRecallIds: [],
+    selectedKnowledgeEntryIds: [],
     aiBreakdown: {
       generatedAt: "",
       source: "",
@@ -308,6 +314,7 @@ const DEFAULT_STATE = {
     },
     lastSavedPresetId: "",
   },
+  knowledge: KNOWLEDGE_CORE.createEmptyKnowledgeState(),
   projects: [
     {
       id: "project-default-cinematic",
@@ -948,6 +955,9 @@ function mergeState(base, saved) {
       negativeOptions: Array.isArray(savedWorkbench.negativeOptions) ? savedWorkbench.negativeOptions : base.workbench.negativeOptions,
       optimizationNotes: Array.isArray(savedWorkbench.optimizationNotes) ? savedWorkbench.optimizationNotes : base.workbench.optimizationNotes,
       lockedRecallIds: Array.isArray(savedWorkbench.lockedRecallIds) ? savedWorkbench.lockedRecallIds : base.workbench.lockedRecallIds,
+      selectedKnowledgeEntryIds: Array.isArray(savedWorkbench.selectedKnowledgeEntryIds)
+        ? savedWorkbench.selectedKnowledgeEntryIds
+        : base.workbench.selectedKnowledgeEntryIds,
       aiBreakdown: {
         ...base.workbench.aiBreakdown,
         ...(savedWorkbench.aiBreakdown || {}),
@@ -968,6 +978,7 @@ function mergeState(base, saved) {
     tags: unique([...(Array.isArray(saved.tags) ? saved.tags : []), ...base.tags]),
     models: mergeById(base.models, saved.models),
     projects,
+    knowledge: KNOWLEDGE_CORE.migrateState(saved.knowledge || base.knowledge),
   };
 }
 
@@ -1010,11 +1021,23 @@ function applyProjectDefaults(project) {
 
 function applyRecalledModule(moduleId) {
   const module = getModule(moduleId);
-  if (!module) return;
-  state.workbench.selectedModuleIds[module.type] = module.id;
-  delete state.workbench.moduleOverrides[module.type];
-  module.uses = (Number(module.uses) || 0) + 1;
-  module.updatedAt = today();
+  if (module) {
+    state.workbench.selectedModuleIds[module.type] = module.id;
+    delete state.workbench.moduleOverrides[module.type];
+    module.uses = (Number(module.uses) || 0) + 1;
+    module.updatedAt = today();
+    return;
+  }
+  const knowledgeModule = getKnowledgeRecallModule(moduleId);
+  if (!knowledgeModule) return;
+  const selectedIds = new Set(state.workbench.selectedKnowledgeEntryIds || []);
+  selectedIds.add(knowledgeModule.knowledgeEntryId);
+  state.workbench.selectedKnowledgeEntryIds = [...selectedIds];
+  const entry = getKnowledgeEntry(knowledgeModule.knowledgeEntryId);
+  if (entry) {
+    entry.uses = (Number(entry.uses) || 0) + 1;
+    entry.updatedAt = new Date().toISOString();
+  }
 }
 
 function toggleRecallLock(moduleId) {
@@ -1026,7 +1049,7 @@ function toggleRecallLock(moduleId) {
     ids.add(moduleId);
     showToast("已锁定召回词条");
   }
-  state.workbench.lockedRecallIds = [...ids].filter((id) => getModule(id));
+  state.workbench.lockedRecallIds = [...ids].filter((id) => getRecallModule(id));
 }
 
 function syncPromptTypeWithMode() {
@@ -1252,7 +1275,7 @@ function renderSmartRecallPanel(entries) {
 function renderSmartRecallCard(entry) {
   const typeLabel = getModuleTypeLabel(entry.module.type);
   const locked = state.workbench.lockedRecallIds?.includes(entry.module.id);
-  const selected = state.workbench.selectedModuleIds?.[entry.module.type] === entry.module.id;
+  const selected = isRecallModuleSelected(entry.module);
   return `
     <article class="smart-recall-card ${locked ? "is-locked" : ""}">
       <div class="smart-recall-card-head">
@@ -1261,10 +1284,10 @@ function renderSmartRecallCard(entry) {
       </div>
       <p>${escapeHtml(entry.reasons.join("；") || "与当前输入语义相近")}</p>
       <div class="smart-recall-actions">
-        <button class="ghost-button compact" type="button" data-apply-recall="${entry.module.id}" ${selected ? "disabled" : ""}>
+        <button class="ghost-button compact" type="button" data-apply-recall="${escapeHtml(entry.module.id)}" ${selected ? "disabled" : ""}>
           <i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "已加入" : "加入当前提示词"}
         </button>
-        <button class="ghost-button compact" type="button" data-toggle-recall-lock="${entry.module.id}">
+        <button class="ghost-button compact" type="button" data-toggle-recall-lock="${escapeHtml(entry.module.id)}">
           <i data-lucide="${locked ? "lock" : "unlock"}"></i>${locked ? "已锁定" : "锁定"}
         </button>
       </div>
@@ -3103,6 +3126,9 @@ function renderProjectStyleMaster(project, language = "zh") {
 function getRepositoryReferenceModules(selectedModules, promptType, task) {
   const selectedIds = new Set(selectedModules.map((item) => item.module.id));
   const recalledModules = getSmartRecallEntries(12).map((entry) => entry.module);
+  const selectedKnowledgeModules = (state.workbench.selectedKnowledgeEntryIds || [])
+    .map((entryId) => getKnowledgeRecallModule(`knowledge-entry:${entryId}`))
+    .filter(Boolean);
   const shouldUseExpression = [promptType, task, state.workbench.activeCategory]
     .filter(Boolean)
     .some((item) => String(item).includes("微表情") || String(item).includes("画面") || String(item).includes("视频"));
@@ -3111,15 +3137,16 @@ function getRepositoryReferenceModules(selectedModules, promptType, task) {
     : [];
   const explicitReferences = selectedModules.map((item) => item.module);
   const orderedReferences = shouldUseExpression
-    ? [...recalledModules, ...expressionReferences, ...explicitReferences]
-    : [...recalledModules, ...explicitReferences];
+    ? [...selectedKnowledgeModules, ...recalledModules, ...expressionReferences, ...explicitReferences]
+    : [...selectedKnowledgeModules, ...recalledModules, ...explicitReferences];
   return uniqueById(orderedReferences).slice(0, 12);
 }
 
 function getSmartRecallEntries(limit = 8) {
-  const lockedIds = new Set((state.workbench.lockedRecallIds || []).filter((id) => getModule(id)));
+  const lockedIds = new Set((state.workbench.lockedRecallIds || []).filter((id) => getRecallModule(id)));
   const context = buildRecallContext();
-  const entries = state.modules
+  const recallModules = [...state.modules, ...getPublishedKnowledgeRecallModules()];
+  const entries = recallModules
     .map((module) => scoreModuleRecall(module, context, lockedIds.has(module.id)))
     .filter((entry) => entry.score > 0 || lockedIds.has(entry.module.id))
     .sort((a, b) => b.score - a.score || Number(b.module.favorite) - Number(a.module.favorite) || (b.module.uses || 0) - (a.module.uses || 0));
@@ -3309,6 +3336,7 @@ function renderModules() {
   const modules = getFilteredModules();
   dom.view.innerHTML = `
     ${renderToolbar("提示词存储库", "保存AI生成时可参考的专业词条：光影、镜头、动作、微表情、质感与负面约束。", "新建词条", "module")}
+    ${renderKnowledgeFoundationSummary()}
     <div class="module-filter-bar">
       <label class="module-search-field" for="moduleSearchInput">
         <i data-lucide="search"></i>
@@ -3348,6 +3376,28 @@ function renderModules() {
   });
   document.getElementById("moduleQuickSettingsBtn").addEventListener("click", openModuleQuickTypeModal);
   bindAssetEvents();
+}
+
+function renderKnowledgeFoundationSummary() {
+  const knowledge = KNOWLEDGE_CORE.migrateState(state.knowledge);
+  const published = knowledge.entries.filter((entry) => entry.status === "published").length;
+  const pending = knowledge.entries.filter((entry) => entry.status === "draft" || entry.status === "review").length;
+  return `
+    <section class="knowledge-foundation-strip" aria-label="专业知识库架构状态">
+      <div>
+        <p class="eyebrow">专业知识架构</p>
+        <strong>可扩展词库底座已启用</strong>
+        <span>文档摄入与审核流程将在下一阶段接入；当前旧词条保持原样。</span>
+      </div>
+      <dl>
+        <div><dt>词库类型</dt><dd>${knowledge.libraryDefinitions.length}</dd></div>
+        <div><dt>知识词条</dt><dd>${knowledge.entries.length}</dd></div>
+        <div><dt>待审核</dt><dd>${pending}</dd></div>
+        <div><dt>已发布</dt><dd>${published}</dd></div>
+        <div><dt>数据版本</dt><dd>v${knowledge.schemaVersion}</dd></div>
+      </dl>
+    </section>
+  `;
 }
 
 function getFilteredModules() {
@@ -4133,6 +4183,29 @@ function getRole(id) {
 
 function getModule(id) {
   return state.modules.find((item) => item.id === id);
+}
+
+function getKnowledgeEntry(id) {
+  return state.knowledge?.entries?.find((item) => item.id === id);
+}
+
+function getPublishedKnowledgeRecallModules() {
+  return KNOWLEDGE_CORE.getRecallModules(state.knowledge);
+}
+
+function getKnowledgeRecallModule(recallId) {
+  return KNOWLEDGE_CORE.resolveRecallModule(state.knowledge, recallId);
+}
+
+function getRecallModule(id) {
+  return getModule(id) || getKnowledgeRecallModule(id);
+}
+
+function isRecallModuleSelected(module) {
+  if (module.sourceKind === "knowledge") {
+    return (state.workbench.selectedKnowledgeEntryIds || []).includes(module.knowledgeEntryId);
+  }
+  return state.workbench.selectedModuleIds?.[module.type] === module.id;
 }
 
 function getPreset(id) {
