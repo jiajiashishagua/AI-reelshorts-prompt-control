@@ -1,5 +1,16 @@
 # AI ReelShorts Prompt Control
 
+## 人物表演案例召回
+
+工作台会根据剧情刺激、真实情绪、面具情绪、人物基线、权力位置、镜头时长、景别和表演阶段，召回可直接引用的微表情案例。用户可以选择或锁定案例，选中的可见动作会进入模块化结果编辑器的【微表情】卡片；锁定案例在改写剧情和重新生成后仍会保留。
+
+当前内置数据由 392 条镜头记录清洗得到 366 条唯一案例，其中 354 条达到发布标准并参与召回，12 条保留为待审核数据。数据构建方式、质量规则与召回权重见 [docs/performance-director.md](docs/performance-director.md)。
+
+```powershell
+node scripts/build-performance-examples.js "人物表情细节训练数据_392镜头.jsonl" "data/performance-examples.js"
+node tests/performance-director.test.js
+```
+
 面向 AI 短视频创作者的提示词创作与资产管理平台。
 
 ## 当前版本

@@ -1,8 +1,10 @@
 const STORAGE_KEY = "ai_reelshorts_prompt_control_v1";
 const KNOWLEDGE_CORE = window.KnowledgeCore;
 const KNOWLEDGE_INGESTION = window.KnowledgeIngestion;
+const PERFORMANCE_DIRECTOR = window.PerformanceDirector;
+const PERFORMANCE_DATA = window.PerformanceExampleData || { stats: {}, examples: [] };
 
-if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION) {
+if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION || !PERFORMANCE_DIRECTOR) {
   throw new Error("知识库组件未加载，请刷新页面后重试。");
 }
 
@@ -285,6 +287,11 @@ const DEFAULT_STATE = {
     optimizationNotes: [],
     lockedRecallIds: [],
     selectedKnowledgeEntryIds: [],
+    performanceDuration: 2.5,
+    performanceRecall: {
+      lockedIds: [],
+      selectedIds: [],
+    },
     aiBreakdown: {
       generatedAt: "",
       source: "",
@@ -964,6 +971,16 @@ function mergeState(base, saved) {
       selectedKnowledgeEntryIds: Array.isArray(savedWorkbench.selectedKnowledgeEntryIds)
         ? savedWorkbench.selectedKnowledgeEntryIds
         : base.workbench.selectedKnowledgeEntryIds,
+      performanceRecall: {
+        ...base.workbench.performanceRecall,
+        ...(savedWorkbench.performanceRecall || {}),
+        lockedIds: Array.isArray(savedWorkbench.performanceRecall?.lockedIds)
+          ? savedWorkbench.performanceRecall.lockedIds
+          : base.workbench.performanceRecall.lockedIds,
+        selectedIds: Array.isArray(savedWorkbench.performanceRecall?.selectedIds)
+          ? savedWorkbench.performanceRecall.selectedIds
+          : base.workbench.performanceRecall.selectedIds,
+      },
       aiBreakdown: {
         ...base.workbench.aiBreakdown,
         ...(savedWorkbench.aiBreakdown || {}),
@@ -1157,6 +1174,7 @@ function renderWorkbench() {
         </div>
         ${renderModularResultEditor()}
         ${renderSmartRecallPanel(getSmartRecallEntries())}
+        ${renderPerformanceRecallPanel()}
         ${renderAiBreakdownPanel()}
         <section class="simple-params-card">
           ${renderProjectStyleBar(project)}
@@ -1295,6 +1313,70 @@ function renderSmartRecallCard(entry) {
           <i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "已加入" : "加入当前提示词"}
         </button>
         <button class="ghost-button compact" type="button" data-toggle-recall-lock="${escapeHtml(entry.module.id)}">
+          <i data-lucide="${locked ? "lock" : "unlock"}"></i>${locked ? "已锁定" : "锁定"}
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderPerformanceRecallPanel() {
+  const recall = getPerformanceRecallEntries(5);
+  const recallState = getPerformanceRecallState();
+  const stats = PERFORMANCE_DATA.stats || {};
+  return `
+    <section class="performance-recall-panel" aria-label="人物表演案例召回">
+      <div class="performance-recall-head">
+        <div>
+          <p class="eyebrow">表演案例召回</p>
+          <h3>人物微表情参考</h3>
+          <span>${stats.publishedCount || 0} 条内置案例 / ${getPublishedUserPerformanceExamples().length} 条用户案例</span>
+        </div>
+        <label class="performance-duration-field" for="performanceDurationInput">
+          <span>镜头时长</span>
+          <input id="performanceDurationInput" type="number" min="0.5" max="10" step="0.5" value="${Number(state.workbench.performanceDuration) || 2.5}" />
+          <b>秒</b>
+        </label>
+      </div>
+      <div class="performance-context-line">
+        <span>刺激：${escapeHtml(recall.context.triggerType)}</span>
+        <span>真实情绪：${escapeHtml(recall.context.primaryEmotion)}</span>
+        <span>面具：${escapeHtml(recall.context.maskEmotion)}</span>
+        <span>阶段：${escapeHtml(recall.context.performancePhase)}</span>
+        <span>${recallState.selectedIds.length} 条已选 / ${recallState.lockedIds.length} 条锁定</span>
+      </div>
+      ${recall.results.length
+        ? `<div class="performance-recall-grid">${recall.results.map(renderPerformanceRecallCard).join("")}</div>`
+        : `<p class="smart-recall-empty">当前输入没有匹配到已发布的表演案例。</p>`}
+    </section>
+  `;
+}
+
+function renderPerformanceRecallCard(result) {
+  const example = result.example;
+  const recallState = getPerformanceRecallState();
+  const selected = recallState.selectedIds.includes(example.id);
+  const locked = recallState.lockedIds.includes(example.id);
+  return `
+    <article class="performance-recall-card ${selected ? "is-selected" : ""} ${locked ? "is-locked" : ""}">
+      <div class="performance-card-head">
+        <span>${escapeHtml(example.primaryEmotion)}</span>
+        <strong>${escapeHtml(example.transition || example.primaryEmotion)}</strong>
+        <small>${escapeHtml(example.performancePhase || "转变")}</small>
+      </div>
+      <p>${escapeHtml(example.visibleAction || example.expressionDetail)}</p>
+      <div class="performance-card-meta">
+        <span>${escapeHtml(example.triggerType)}</span>
+        <span>${escapeHtml(example.shotSize || "未标注")}</span>
+        <span>${Number(example.durationSeconds) || "-"}s</span>
+        <span>质量 ${Math.round((Number(example.qualityScore) || 0) * 100)}%</span>
+      </div>
+      <div class="performance-match-reasons">${result.reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join("")}</div>
+      <div class="performance-card-actions">
+        <button class="ghost-button compact ${selected ? "is-active" : ""}" type="button" data-select-performance-example="${escapeHtml(example.id)}">
+          <i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "已加入参考" : "加入参考"}
+        </button>
+        <button class="ghost-button compact" type="button" data-lock-performance-example="${escapeHtml(example.id)}">
           <i data-lucide="${locked ? "lock" : "unlock"}"></i>${locked ? "已锁定" : "锁定"}
         </button>
       </div>
@@ -1898,6 +1980,34 @@ function bindWorkbenchEvents() {
       regenerateResults();
       renderWorkbench();
       refreshIcons();
+    });
+  });
+
+  const performanceDurationInput = document.getElementById("performanceDurationInput");
+  if (performanceDurationInput) {
+    performanceDurationInput.addEventListener("change", () => {
+      wb.performanceDuration = Math.max(0.5, Math.min(10, Number(performanceDurationInput.value) || 2.5));
+      saveState();
+      renderWorkbench();
+    });
+  }
+
+  document.querySelectorAll("[data-select-performance-example]").forEach((button) => {
+    button.addEventListener("click", () => {
+      togglePerformanceExampleSelection(button.dataset.selectPerformanceExample);
+      regenerateResults();
+      saveState();
+      renderWorkbench();
+      showToast("表演案例参考已更新");
+    });
+  });
+
+  document.querySelectorAll("[data-lock-performance-example]").forEach((button) => {
+    button.addEventListener("click", () => {
+      togglePerformanceExampleLock(button.dataset.lockPerformanceExample);
+      saveState();
+      renderWorkbench();
+      showToast("表演案例锁定状态已更新");
     });
   });
 
@@ -2678,7 +2788,11 @@ function buildResultCards(payload) {
   const lightingValue = getSelectedAiBreakdownValue("lightingMood") || wb.lightingControl || wb.sceneGoal || project?.lightingPreference || "请补充光影氛围。";
   const cameraValue = getSelectedAiBreakdownValue("cameraParams") || parameterLines.join("\n");
   const actionValue = getSelectedAiBreakdownValue("action") || wb.actionDetail || wb.action || role?.actions || "请补充人物动作。";
-  const expressionValue = getSelectedAiBreakdownValue("microExpression") || wb.expressionDetail || role?.anger || "请补充微表情。";
+  const expressionBase = getSelectedAiBreakdownValue("microExpression") || wb.expressionDetail || role?.anger || "请补充微表情。";
+  const selectedPerformanceActions = getSelectedPerformanceReferenceModules().map((module) => module.zh).filter(Boolean);
+  const expressionValue = selectedPerformanceActions.length
+    ? [expressionBase, ...selectedPerformanceActions.map((action, index) => `表演参考 ${index + 1}：${action}`)].join("\n")
+    : expressionBase;
   const lensValue = getSelectedAiBreakdownValue("cameraMotion") || project?.lensLanguage || [wb.shotSize, wb.cameraAngle, wb.composition, wb.cameraSpeed].filter(Boolean).join(" / ");
   const textureValue = getSelectedAiBreakdownValue("texture") || project?.characterTexture || wb.texture || "请补充画面质感。";
   const negativeValue = getSelectedAiBreakdownValue("negative") || negative;
@@ -3136,6 +3250,7 @@ function getRepositoryReferenceModules(selectedModules, promptType, task) {
   const selectedKnowledgeModules = (state.workbench.selectedKnowledgeEntryIds || [])
     .map((entryId) => getKnowledgeRecallModule(`knowledge-entry:${entryId}`))
     .filter(Boolean);
+  const selectedPerformanceModules = getSelectedPerformanceReferenceModules();
   const shouldUseExpression = [promptType, task, state.workbench.activeCategory]
     .filter(Boolean)
     .some((item) => String(item).includes("微表情") || String(item).includes("画面") || String(item).includes("视频"));
@@ -3144,9 +3259,82 @@ function getRepositoryReferenceModules(selectedModules, promptType, task) {
     : [];
   const explicitReferences = selectedModules.map((item) => item.module);
   const orderedReferences = shouldUseExpression
-    ? [...selectedKnowledgeModules, ...recalledModules, ...expressionReferences, ...explicitReferences]
-    : [...selectedKnowledgeModules, ...recalledModules, ...explicitReferences];
+    ? [...selectedPerformanceModules, ...selectedKnowledgeModules, ...recalledModules, ...expressionReferences, ...explicitReferences]
+    : [...selectedPerformanceModules, ...selectedKnowledgeModules, ...recalledModules, ...explicitReferences];
   return uniqueById(orderedReferences).slice(0, 12);
+}
+
+function getPerformanceRecallState() {
+  const wb = state.workbench;
+  wb.performanceRecall = wb.performanceRecall || clone(DEFAULT_STATE.workbench.performanceRecall);
+  const availableIds = new Set(getAllPerformanceExamples().map((example) => example.id));
+  wb.performanceRecall.lockedIds = (wb.performanceRecall.lockedIds || []).filter((id) => availableIds.has(id));
+  wb.performanceRecall.selectedIds = (wb.performanceRecall.selectedIds || []).filter((id) => availableIds.has(id));
+  return wb.performanceRecall;
+}
+
+function getPublishedUserPerformanceExamples() {
+  return (state.knowledge?.entries || [])
+    .filter((entry) => entry.libraryType === "expression_case" && entry.status === "published")
+    .map((entry) => PERFORMANCE_DIRECTOR.knowledgeEntryToExample(entry));
+}
+
+function getAllPerformanceExamples() {
+  return [...(PERFORMANCE_DATA.examples || []), ...getPublishedUserPerformanceExamples()];
+}
+
+function buildPerformanceRecallInput() {
+  const wb = state.workbench;
+  const role = getRole(wb.roleId);
+  const recallState = wb.performanceRecall || DEFAULT_STATE.workbench.performanceRecall;
+  return {
+    brief: wb.sourceBrief,
+    sceneGoal: wb.sceneGoal,
+    frameDescription: wb.frameDescription,
+    characterState: wb.characterState,
+    relationTension: wb.relationTension,
+    expressionDetail: wb.expressionDetail,
+    actionDetail: wb.actionDetail,
+    roleTemperament: role?.temperament,
+    roleExpressions: [role?.anger, role?.grievance, role?.nervous, role?.cold, role?.collapse].filter(Boolean).join(" "),
+    durationSeconds: Number(wb.performanceDuration) || 0,
+    shotSize: wb.shotSize,
+    lockedIds: recallState.lockedIds || [],
+  };
+}
+
+function getPerformanceRecallEntries(limit = 5) {
+  return PERFORMANCE_DIRECTOR.recallExamples(buildPerformanceRecallInput(), getAllPerformanceExamples(), limit);
+}
+
+function getPerformanceExample(id) {
+  return getAllPerformanceExamples().find((example) => example.id === id);
+}
+
+function togglePerformanceExampleSelection(id) {
+  if (!getPerformanceExample(id)) return;
+  const recallState = getPerformanceRecallState();
+  const ids = new Set(recallState.selectedIds);
+  if (ids.has(id)) ids.delete(id);
+  else ids.add(id);
+  recallState.selectedIds = [...ids];
+}
+
+function togglePerformanceExampleLock(id) {
+  if (!getPerformanceExample(id)) return;
+  const recallState = getPerformanceRecallState();
+  const ids = new Set(recallState.lockedIds);
+  if (ids.has(id)) ids.delete(id);
+  else ids.add(id);
+  recallState.lockedIds = [...ids];
+}
+
+function getSelectedPerformanceReferenceModules() {
+  const recallState = getPerformanceRecallState();
+  return recallState.selectedIds
+    .map(getPerformanceExample)
+    .filter(Boolean)
+    .map((example) => PERFORMANCE_DIRECTOR.exampleToReferenceModule(example));
 }
 
 function getSmartRecallEntries(limit = 8) {

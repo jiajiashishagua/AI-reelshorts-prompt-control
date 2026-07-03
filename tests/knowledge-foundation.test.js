@@ -78,6 +78,10 @@ const coreSource = fs.readFileSync(path.join(root, "knowledge-core.js"), "utf8")
 vm.runInContext(coreSource, sandbox, { filename: "knowledge-core.js" });
 const ingestionSource = fs.readFileSync(path.join(root, "knowledge-ingestion.js"), "utf8");
 vm.runInContext(ingestionSource, sandbox, { filename: "knowledge-ingestion.js" });
+const performanceDataSource = fs.readFileSync(path.join(root, "data", "performance-examples.js"), "utf8");
+vm.runInContext(performanceDataSource, sandbox, { filename: "performance-examples.js" });
+const performanceDirectorSource = fs.readFileSync(path.join(root, "performance-director.js"), "utf8");
+vm.runInContext(performanceDirectorSource, sandbox, { filename: "performance-director.js" });
 
 let appSource = fs.readFileSync(path.join(root, "script.js"), "utf8");
 appSource = appSource.replace(/\binit\(\);\s*$/, "");
