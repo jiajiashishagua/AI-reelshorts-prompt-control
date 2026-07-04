@@ -29,7 +29,7 @@ npx wrangler dev
 DEEPSEEK_API_KEY=替换为你的密钥
 ```
 
-不要把密钥写入 `api-config.js`、`script.js`、HTML 或 Git 仓库。
+不要把密钥写入 `PromptControlConfig`、`script.js`、HTML 或 Git 仓库。
 
 ## 云端部署
 
@@ -49,7 +49,7 @@ npx wrangler pages secret put DEEPSEEK_API_KEY --project-name prompt-control-dee
 npm run deploy:pages
 ```
 
-部署后，将网关地址写入根目录的 `api-config.js`：
+部署后，将网关地址写入根目录 `index.html` 的运行时配置：
 
 ```js
 window.PromptControlConfig = Object.freeze({
