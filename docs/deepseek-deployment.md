@@ -3,10 +3,10 @@
 ## 架构
 
 ```text
-网页工作台 -> Cloudflare Worker -> DeepSeek 官方 API
+网页工作台 -> Cloudflare Pages Function / Worker -> DeepSeek 官方 API
 ```
 
-浏览器只访问 Worker，不保存或传递 DeepSeek API Key。Worker 从 Cloudflare Secret 中读取密钥，校验请求来源、模型和输入大小后，再调用 DeepSeek。
+浏览器只访问云端网关，不保存或传递 DeepSeek API Key。网关从 Cloudflare Secret 中读取密钥，校验请求来源、模型和输入大小后，再调用 DeepSeek。生产环境使用 `pages.dev`，避免中国大陆网络对 `workers.dev` 的 DNS 污染。
 
 ## 可用模型
 
@@ -40,11 +40,20 @@ npx wrangler secret put DEEPSEEK_API_KEY
 npx wrangler deploy
 ```
 
-部署后，将 Worker 地址写入根目录的 `api-config.js`。生产环境优先使用独立域名：
+中国大陆可访问的生产网关使用 Pages Function：
+
+```powershell
+cd worker
+npx wrangler pages project create prompt-control-deepseek-api --production-branch main
+npx wrangler pages secret put DEEPSEEK_API_KEY --project-name prompt-control-deepseek-api
+npm run deploy:pages
+```
+
+部署后，将网关地址写入根目录的 `api-config.js`：
 
 ```js
 window.PromptControlConfig = Object.freeze({
-  apiBaseUrl: "https://api.prompt.jiajiashishagua.online",
+  apiBaseUrl: "https://prompt-control-deepseek-api.pages.dev",
 });
 ```
 
@@ -79,6 +88,13 @@ Remove-Item Env:DEEPSEEK_API_KEY
 ```powershell
 cd worker
 npx wrangler secret put DEEPSEEK_API_KEY
+```
+
+Pages 项目轮换 Secret：
+
+```powershell
+cd worker
+npx wrangler pages secret put DEEPSEEK_API_KEY --project-name prompt-control-deepseek-api
 ```
 
 Secret 更新后不需要修改网页代码。旧密钥确认停用前，应先调用 `/health` 并完成一次真实生成测试。

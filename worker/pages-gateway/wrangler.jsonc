@@ -1,0 +1,10 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "prompt-control-deepseek-api",
+  "pages_build_output_dir": "./pages",
+  "compatibility_date": "2026-07-04",
+  "vars": {
+    "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    "ALLOWED_ORIGINS": "https://prompt.jiajiashishagua.online,http://127.0.0.1:8765,http://localhost:8765"
+  }
+}

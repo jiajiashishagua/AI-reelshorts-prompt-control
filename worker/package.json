@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:pages": "cd pages-gateway && wrangler pages deploy pages --project-name prompt-control-deepseek-api --branch main",
     "test": "node ../tests/deepseek-worker.test.mjs"
   },
   "devDependencies": {
