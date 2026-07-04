@@ -1,9 +1,17 @@
 const STORAGE_KEY = "ai_reelshorts_prompt_control_v1";
+const APP_CONFIG = window.PromptControlConfig || { apiBaseUrl: "" };
 const KNOWLEDGE_CORE = window.KnowledgeCore;
 const KNOWLEDGE_INGESTION = window.KnowledgeIngestion;
 const PERFORMANCE_DIRECTOR = window.PerformanceDirector;
 const PERFORMANCE_PLANNER = window.PerformancePlanner;
 const PERFORMANCE_DATA = window.PerformanceExampleData || { stats: {}, examples: [] };
+
+const TEXT_MODEL_OPTIONS = [
+  { id: "local", label: "本地专业引擎", description: "不调用API，零成本生成。", available: true },
+  { id: "deepseek-v3", label: "DeepSeek V3（官方API已不可用）", description: "当前账户不再提供独立V3模型。", available: false },
+  { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", description: "速度快、成本低，推荐日常使用。", available: true },
+  { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", description: "适合复杂剧情与高精度方案。", available: true },
+];
 
 if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION || !PERFORMANCE_DIRECTOR || !PERFORMANCE_PLANNER) {
   throw new Error("知识库组件未加载，请刷新页面后重试。");
@@ -289,6 +297,8 @@ const DEFAULT_STATE = {
     lockedRecallIds: [],
     selectedKnowledgeEntryIds: [],
     performanceDuration: 2.5,
+    textModelId: "local",
+    textModelThinking: false,
     performanceRecall: {
       lockedIds: [],
       selectedIds: [],
@@ -300,6 +310,9 @@ const DEFAULT_STATE = {
       selectedPlanId: "",
       lockedPlanId: "",
       customPrompts: {},
+      generatorLabel: "本地专业引擎",
+      fallbackReason: "",
+      usage: null,
     },
     aiBreakdown: {
       generatedAt: "",
@@ -871,6 +884,34 @@ const DEFAULT_STATE = {
       apiKey: "",
       notes: "待接入。",
     },
+    {
+      id: "model-deepseek-v4-flash",
+      name: "DeepSeek V4 Flash",
+      provider: "DeepSeek",
+      modelId: "deepseek-v4-flash",
+      endpoint: "云端网关",
+      type: "文本",
+      usage: "人物表演方案、提示词生成和结构化拆解",
+      language: "中文",
+      enabled: true,
+      priority: 2,
+      cloudManaged: true,
+      notes: "API Key 由 Cloudflare Worker Secret 管理，不保存在浏览器。",
+    },
+    {
+      id: "model-deepseek-v4-pro",
+      name: "DeepSeek V4 Pro",
+      provider: "DeepSeek",
+      modelId: "deepseek-v4-pro",
+      endpoint: "云端网关",
+      type: "文本",
+      usage: "复杂剧情推理和高精度人物表演方案",
+      language: "中文",
+      enabled: true,
+      priority: 3,
+      cloudManaged: true,
+      notes: "可开启深度思考；API Key 由云端 Secret 管理。",
+    },
   ],
 };
 
@@ -1418,16 +1459,33 @@ function renderPerformancePlannerPanel() {
           <h3>人物表演方案</h3>
           <span>把剧情判断与召回案例合成为分秒可执行的表情、呼吸和身体动作。</span>
         </div>
-        <button class="pf-button pf-primary" type="button" id="performancePlanGenerateBtn">
-          <i data-lucide="clapperboard"></i>
-          ${hasPlans ? "重新生成方案" : "生成表演方案"}
-        </button>
+        <div class="performance-planner-controls">
+          <label for="performanceTextModelSelect">
+            <span>文本模型</span>
+            <select id="performanceTextModelSelect">
+              ${TEXT_MODEL_OPTIONS.map((model) => `<option value="${model.id}" ${state.workbench.textModelId === model.id ? "selected" : ""} ${model.available ? "" : "disabled"}>${escapeHtml(model.label)}</option>`).join("")}
+            </select>
+          </label>
+          <label for="performanceThinkingSelect">
+            <span>推理模式</span>
+            <select id="performanceThinkingSelect" ${state.workbench.textModelId === "local" ? "disabled" : ""}>
+              <option value="false" ${state.workbench.textModelThinking ? "" : "selected"}>标准</option>
+              <option value="true" ${state.workbench.textModelThinking ? "selected" : ""}>深度思考</option>
+            </select>
+          </label>
+          <button class="pf-button pf-primary" type="button" id="performancePlanGenerateBtn">
+            <i data-lucide="clapperboard"></i>
+            ${hasPlans ? "重新生成方案" : "生成表演方案"}
+          </button>
+        </div>
       </div>
       ${hasPlans ? `
         <div class="performance-plan-meta">
-          <span>本地专业引擎</span>
+          <span>${escapeHtml(plannerState.generatorLabel || "本地专业引擎")}</span>
           <span>${plannerState.plans.length} 套方案</span>
           ${plannerState.lockedPlanId ? "<span>1 套已锁定</span>" : ""}
+          ${plannerState.usage?.total_tokens ? `<span>${Number(plannerState.usage.total_tokens)} tokens</span>` : ""}
+          ${plannerState.fallbackReason ? `<span class="is-warning">云端失败，已回退本地：${escapeHtml(plannerState.fallbackReason)}</span>` : ""}
           <span class="performance-plan-stale is-warning" ${inputChanged ? "" : "hidden"}>输入已变化，建议重新生成</span>
         </div>
         <div class="performance-plan-grid">
@@ -2134,14 +2192,37 @@ function bindWorkbenchEvents() {
     });
   });
 
+  const performanceTextModelSelect = document.getElementById("performanceTextModelSelect");
+  if (performanceTextModelSelect) {
+    performanceTextModelSelect.addEventListener("change", (event) => {
+      const model = getTextModelOption(event.target.value);
+      if (!model?.available) return;
+      wb.textModelId = model.id;
+      if (model.id === "local") wb.textModelThinking = false;
+      saveState();
+      renderWorkbench();
+      refreshIcons();
+    });
+  }
+
+  const performanceThinkingSelect = document.getElementById("performanceThinkingSelect");
+  if (performanceThinkingSelect) {
+    performanceThinkingSelect.addEventListener("change", (event) => {
+      wb.textModelThinking = event.target.value === "true";
+      saveState();
+    });
+  }
+
   const performancePlanGenerateButton = document.getElementById("performancePlanGenerateBtn");
   if (performancePlanGenerateButton) {
     performancePlanGenerateButton.addEventListener("click", async () => {
-      await generatePerformancePlans();
+      performancePlanGenerateButton.disabled = true;
+      performancePlanGenerateButton.textContent = "正在生成";
+      const generation = await generatePerformancePlans();
       regenerateResults();
       renderWorkbench();
       refreshIcons();
-      showToast("人物表演方案已生成");
+      showToast(generation.fallbackReason ? "云端调用失败，已使用本地引擎" : `${generation.generatorLabel} 已生成方案`);
     });
   }
 
@@ -3571,7 +3652,8 @@ async function generatePerformancePlans() {
   const previous = getPerformancePlanState();
   const lockedPlan = previous.plans.find((plan) => plan.id === previous.lockedPlanId);
   const context = buildPerformancePlannerContext();
-  const generatedPlans = await requestPerformancePlansFromModel(context);
+  const generation = await requestPerformancePlansFromModel(context);
+  const generatedPlans = generation.plans;
   const plans = lockedPlan
     ? generatedPlans.map((plan) => plan.id === lockedPlan.id ? lockedPlan : plan)
     : generatedPlans;
@@ -3588,17 +3670,74 @@ async function generatePerformancePlans() {
     customPrompts: lockedPlan && previous.customPrompts[lockedPlan.id]
       ? { [lockedPlan.id]: previous.customPrompts[lockedPlan.id] }
       : {},
+    generatorLabel: generation.generatorLabel,
+    fallbackReason: generation.fallbackReason || "",
+    usage: generation.usage || null,
   };
   saveState();
+  return generation;
 }
 
 async function requestPerformancePlansFromModel(context) {
-  // Future API seam: send context.input and context.recallResults to a cloud model here.
-  return generateLocalPerformancePlans(context);
+  const model = getTextModelOption(state.workbench.textModelId);
+  if (!model || !model.available || model.id === "local") {
+    return {
+      plans: generateLocalPerformancePlans(context),
+      generatorLabel: "本地专业引擎",
+      fallbackReason: "",
+      usage: null,
+    };
+  }
+  const apiBaseUrl = String(APP_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
+  if (!apiBaseUrl) {
+    return {
+      plans: generateLocalPerformancePlans(context),
+      generatorLabel: "本地专业引擎",
+      fallbackReason: "未配置云端API地址",
+      usage: null,
+    };
+  }
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 65_000);
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/performance-plans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model.id,
+        thinking: Boolean(state.workbench.textModelThinking),
+        context,
+      }),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `云端请求失败（${response.status}）`);
+    if (!Array.isArray(data.plans) || data.plans.length !== 3) throw new Error("云端返回的方案结构无效");
+    return {
+      plans: data.plans,
+      generatorLabel: `${model.label}${state.workbench.textModelThinking ? " / 深度思考" : ""}`,
+      fallbackReason: "",
+      usage: data.meta?.usage || null,
+    };
+  } catch (error) {
+    console.warn("DeepSeek generation fallback:", error.message);
+    return {
+      plans: generateLocalPerformancePlans(context),
+      generatorLabel: "本地专业引擎",
+      fallbackReason: error.name === "AbortError" ? "请求超时" : error.message,
+      usage: null,
+    };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function generateLocalPerformancePlans(context) {
   return PERFORMANCE_PLANNER.buildPlans(context.input, context.recallResults);
+}
+
+function getTextModelOption(modelId) {
+  return TEXT_MODEL_OPTIONS.find((model) => model.id === modelId) || TEXT_MODEL_OPTIONS[0];
 }
 
 function getSelectedPerformancePlan() {
@@ -4606,9 +4745,12 @@ function renderModels() {
 }
 
 function renderModelRow(model) {
+  const credentialHint = model.cloudManaged
+    ? "密钥由云端 Secret 管理"
+    : model.id === "model-local" ? "无需 API Key" : "请在云端网关配置密钥";
   return `
     <tr>
-      <td><strong>${escapeHtml(model.name)}</strong><p class="hint">${model.apiKey ? "API Key 已本地保存" : "未配置 API Key"}</p></td>
+      <td><strong>${escapeHtml(model.name)}</strong><p class="hint">${credentialHint}</p></td>
       <td>${escapeHtml(model.type)}</td>
       <td>${escapeHtml(model.usage)}</td>
       <td>${escapeHtml(model.language)}</td>
@@ -4881,6 +5023,11 @@ function openModelModal(model = null) {
       </div>
       ${textareaField("usage", "用途说明", item.usage)}
       <div class="field-grid three-col">
+        ${inputField("provider", "服务商", item.provider || "")}
+        ${inputField("modelId", "模型标识", item.modelId || "")}
+        ${inputField("endpoint", "云端网关", item.endpoint || "云端网关")}
+      </div>
+      <div class="field-grid three-col">
         ${inputField("language", "默认输出语言", item.language || "中英双语")}
         ${inputField("priority", "优先级", item.priority || 1, "number")}
         <div class="field">
@@ -4891,7 +5038,7 @@ function openModelModal(model = null) {
           </select>
         </div>
       </div>
-      ${inputField("apiKey", "API Key，本地保存", item.apiKey || "", "password")}
+      <p class="hint">API Key 不在网页和浏览器中保存，请通过 Cloudflare Worker Secret 或其他服务器密钥管理服务配置。</p>
       ${textareaField("notes", "备注", item.notes)}
     </section>
   `;
@@ -5002,11 +5149,14 @@ function saveTag(tag) {
 }
 
 function saveModel(data) {
+  const existing = modalEditingId ? getModel(modalEditingId) : null;
   const model = {
     id: modalEditingId || createId("model"),
+    ...(existing || {}),
     ...data,
     enabled: data.enabled === "true",
     priority: Number(data.priority) || 0,
+    apiKey: "",
   };
   upsert(state.models, model);
 }

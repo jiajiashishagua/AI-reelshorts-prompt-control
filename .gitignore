@@ -1,3 +1,9 @@
 screenshot-*.png
 .DS_Store
 Thumbs.db
+node_modules/
+.dev.vars
+.env
+.env.*
+!.env.example
+.wrangler/

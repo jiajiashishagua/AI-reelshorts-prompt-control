@@ -999,6 +999,37 @@ body.dark .performance-planner-head > div > span {
   color: #afa6bd;
 }
 
+.performance-planner-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.performance-planner-controls label {
+  display: grid;
+  gap: 4px;
+  color: #786e81;
+  font-size: 0.68rem;
+}
+
+.performance-planner-controls select {
+  min-width: 168px;
+  min-height: 40px;
+  padding: 7px 34px 7px 10px;
+  font-size: 0.78rem;
+}
+
+.performance-planner-controls label:nth-child(2) select {
+  min-width: 104px;
+}
+
+body.dark .performance-planner-controls label {
+  color: #aaa0b5;
+}
+
 .performance-plan-meta,
 .performance-plan-analysis,
 .performance-plan-card-actions,
@@ -3870,6 +3901,18 @@ tr:last-child td {
 
   .performance-planner-head .pf-button {
     width: 100%;
+  }
+
+  .performance-planner-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .performance-planner-controls select,
+  .performance-planner-controls label:nth-child(2) select {
+    width: 100%;
+    min-width: 0;
   }
 
   .smart-recall-grid {
