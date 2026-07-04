@@ -82,6 +82,8 @@ const performanceDataSource = fs.readFileSync(path.join(root, "data", "performan
 vm.runInContext(performanceDataSource, sandbox, { filename: "performance-examples.js" });
 const performanceDirectorSource = fs.readFileSync(path.join(root, "performance-director.js"), "utf8");
 vm.runInContext(performanceDirectorSource, sandbox, { filename: "performance-director.js" });
+const performancePlannerSource = fs.readFileSync(path.join(root, "performance-planner.js"), "utf8");
+vm.runInContext(performancePlannerSource, sandbox, { filename: "performance-planner.js" });
 
 let appSource = fs.readFileSync(path.join(root, "script.js"), "utf8");
 appSource = appSource.replace(/\binit\(\);\s*$/, "");
@@ -93,6 +95,12 @@ appSource += `
     toggleRecallLock,
     getRepositoryReferenceModules,
     renderKnowledgeFoundationSummary,
+    buildPerformancePlannerContext,
+    generateLocalPerformancePlans,
+    getPerformancePlanState,
+    selectPerformancePlan,
+    savePerformancePlanAsKnowledge,
+    getPerformancePlanForJson,
   };
 `;
 vm.runInContext(appSource, sandbox, { filename: "script.js" });
@@ -131,5 +139,22 @@ const customKnowledge = sandbox.KnowledgeCore.registerLibraryDefinition(api.stat
   structuredFields: ["material", "surface", "movement"],
 });
 assert.ok(customKnowledge.libraryDefinitions.some((item) => item.id === "costume_material"));
+
+const plannerContext = api.buildPerformancePlannerContext();
+const performancePlans = api.generateLocalPerformancePlans(plannerContext);
+assert.equal(performancePlans.length, 3);
+api.state.workbench.performancePlan.plans = performancePlans;
+api.state.workbench.performancePlan.selectedPlanId = performancePlans[0].id;
+api.selectPerformancePlan(performancePlans[1].id);
+assert.equal(api.getPerformancePlanState().selectedPlanId, performancePlans[1].id);
+assert.equal(api.getPerformancePlanForJson().strategyId, performancePlans[1].strategyId);
+
+const entryCountBeforePlanSave = api.state.knowledge.entries.length;
+api.savePerformancePlanAsKnowledge(performancePlans[1].id);
+assert.equal(api.state.knowledge.entries.length, entryCountBeforePlanSave + 1);
+const savedPlanEntry = api.state.knowledge.entries[0];
+assert.equal(savedPlanEntry.libraryType, "expression_case");
+assert.equal(savedPlanEntry.status, "published");
+assert.equal(savedPlanEntry.structuredData.planner.strategyId, performancePlans[1].strategyId);
 
 console.log("knowledge foundation tests passed");

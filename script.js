@@ -2,9 +2,10 @@ const STORAGE_KEY = "ai_reelshorts_prompt_control_v1";
 const KNOWLEDGE_CORE = window.KnowledgeCore;
 const KNOWLEDGE_INGESTION = window.KnowledgeIngestion;
 const PERFORMANCE_DIRECTOR = window.PerformanceDirector;
+const PERFORMANCE_PLANNER = window.PerformancePlanner;
 const PERFORMANCE_DATA = window.PerformanceExampleData || { stats: {}, examples: [] };
 
-if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION || !PERFORMANCE_DIRECTOR) {
+if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION || !PERFORMANCE_DIRECTOR || !PERFORMANCE_PLANNER) {
   throw new Error("知识库组件未加载，请刷新页面后重试。");
 }
 
@@ -291,6 +292,14 @@ const DEFAULT_STATE = {
     performanceRecall: {
       lockedIds: [],
       selectedIds: [],
+    },
+    performancePlan: {
+      generatedAt: "",
+      sourceSignature: "",
+      plans: [],
+      selectedPlanId: "",
+      lockedPlanId: "",
+      customPrompts: {},
     },
     aiBreakdown: {
       generatedAt: "",
@@ -981,6 +990,17 @@ function mergeState(base, saved) {
           ? savedWorkbench.performanceRecall.selectedIds
           : base.workbench.performanceRecall.selectedIds,
       },
+      performancePlan: {
+        ...base.workbench.performancePlan,
+        ...(savedWorkbench.performancePlan || {}),
+        plans: Array.isArray(savedWorkbench.performancePlan?.plans)
+          ? savedWorkbench.performancePlan.plans
+          : base.workbench.performancePlan.plans,
+        customPrompts: {
+          ...base.workbench.performancePlan.customPrompts,
+          ...(savedWorkbench.performancePlan?.customPrompts || {}),
+        },
+      },
       aiBreakdown: {
         ...base.workbench.aiBreakdown,
         ...(savedWorkbench.aiBreakdown || {}),
@@ -1175,6 +1195,7 @@ function renderWorkbench() {
         ${renderModularResultEditor()}
         ${renderSmartRecallPanel(getSmartRecallEntries())}
         ${renderPerformanceRecallPanel()}
+        ${renderPerformancePlannerPanel()}
         ${renderAiBreakdownPanel()}
         <section class="simple-params-card">
           ${renderProjectStyleBar(project)}
@@ -1381,6 +1402,108 @@ function renderPerformanceRecallCard(result) {
         </button>
       </div>
     </article>
+  `;
+}
+
+function renderPerformancePlannerPanel() {
+  const plannerState = getPerformancePlanState();
+  const selectedPlan = getSelectedPerformancePlan();
+  const hasPlans = plannerState.plans.length > 0;
+  const inputChanged = hasPlans && plannerState.sourceSignature !== getCurrentPerformancePlannerSignature();
+  return `
+    <section class="performance-planner-panel" aria-label="人物表演方案生成器">
+      <div class="performance-planner-head">
+        <div>
+          <p class="eyebrow">第五阶段 · 表演导演</p>
+          <h3>人物表演方案</h3>
+          <span>把剧情判断与召回案例合成为分秒可执行的表情、呼吸和身体动作。</span>
+        </div>
+        <button class="pf-button pf-primary" type="button" id="performancePlanGenerateBtn">
+          <i data-lucide="clapperboard"></i>
+          ${hasPlans ? "重新生成方案" : "生成表演方案"}
+        </button>
+      </div>
+      ${hasPlans ? `
+        <div class="performance-plan-meta">
+          <span>本地专业引擎</span>
+          <span>${plannerState.plans.length} 套方案</span>
+          ${plannerState.lockedPlanId ? "<span>1 套已锁定</span>" : ""}
+          <span class="performance-plan-stale is-warning" ${inputChanged ? "" : "hidden"}>输入已变化，建议重新生成</span>
+        </div>
+        <div class="performance-plan-grid">
+          ${plannerState.plans.map(renderPerformancePlanCard).join("")}
+        </div>
+        ${selectedPlan ? renderPerformancePlanEditor(selectedPlan) : ""}
+      ` : `
+        <div class="performance-plan-empty">
+          <strong>先确认剧情与镜头时长，再生成三种导演策略</strong>
+          <span>系统会参考当前项目、角色资产和上方召回案例，生成克制留白、递进泄露与临界释放方案。</span>
+        </div>
+      `}
+    </section>
+  `;
+}
+
+function renderPerformancePlanCard(plan) {
+  const plannerState = getPerformancePlanState();
+  const selected = plannerState.selectedPlanId === plan.id;
+  const locked = plannerState.lockedPlanId === plan.id;
+  return `
+    <article class="performance-plan-card ${selected ? "is-selected" : ""} ${locked ? "is-locked" : ""}">
+      <div class="performance-plan-card-head">
+        <div>
+          <span>${escapeHtml(plan.intensity)}</span>
+          <strong>${escapeHtml(plan.title)}</strong>
+        </div>
+        <b>${Math.round(Number(plan.fitScore) || 0)}%</b>
+      </div>
+      <p>${escapeHtml(plan.summary)}</p>
+      <div class="performance-plan-analysis">
+        <span>${escapeHtml(plan.analysis?.primaryEmotion || "复杂情绪")}</span>
+        <span>${escapeHtml(plan.analysis?.maskEmotion || "无明确面具")}</span>
+        <span>${escapeHtml(plan.analysis?.performancePhase || "转变")}</span>
+        <span>${escapeHtml(plan.shotSize || "未标注")} / ${Number(plan.durationSeconds) || "-"}s</span>
+      </div>
+      <div class="performance-plan-timeline">
+        ${(plan.beats || []).map((beat) => `
+          <div>
+            <time>${escapeHtml(beat.label)}</time>
+            <span><b>${escapeHtml(beat.phase)}</b>${escapeHtml(beat.action)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="performance-plan-card-actions">
+        <button class="ghost-button compact ${selected ? "is-active" : ""}" type="button" data-select-performance-plan="${escapeHtml(plan.id)}">
+          <i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "已采用" : "采用方案"}
+        </button>
+        <button class="ghost-button compact" type="button" data-lock-performance-plan="${escapeHtml(plan.id)}">
+          <i data-lucide="${locked ? "lock" : "unlock"}"></i>${locked ? "已锁定" : "锁定"}
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderPerformancePlanEditor(plan) {
+  const prompt = getPerformancePlanPrompt(plan.id);
+  return `
+    <div class="performance-plan-editor">
+      <div class="performance-plan-editor-head">
+        <div>
+          <span>当前采用方案</span>
+          <strong>${escapeHtml(plan.title)}</strong>
+        </div>
+        <div class="performance-plan-editor-actions">
+          <button class="ghost-button compact" type="button" data-copy-performance-plan="${escapeHtml(plan.id)}">
+            <i data-lucide="copy"></i>复制
+          </button>
+          <button class="ghost-button compact" type="button" data-save-performance-plan="${escapeHtml(plan.id)}">
+            <i data-lucide="database"></i>保存词条
+          </button>
+        </div>
+      </div>
+      <textarea data-performance-plan-edit="${escapeHtml(plan.id)}" rows="14">${escapeHtml(prompt)}</textarea>
+    </div>
   `;
 }
 
@@ -2011,6 +2134,58 @@ function bindWorkbenchEvents() {
     });
   });
 
+  const performancePlanGenerateButton = document.getElementById("performancePlanGenerateBtn");
+  if (performancePlanGenerateButton) {
+    performancePlanGenerateButton.addEventListener("click", async () => {
+      await generatePerformancePlans();
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+      showToast("人物表演方案已生成");
+    });
+  }
+
+  document.querySelectorAll("[data-select-performance-plan]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectPerformancePlan(button.dataset.selectPerformancePlan);
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+      showToast("已采用人物表演方案");
+    });
+  });
+
+  document.querySelectorAll("[data-lock-performance-plan]").forEach((button) => {
+    button.addEventListener("click", () => {
+      togglePerformancePlanLock(button.dataset.lockPerformancePlan);
+      regenerateResults();
+      renderWorkbench();
+      refreshIcons();
+      showToast("表演方案锁定状态已更新");
+    });
+  });
+
+  document.querySelectorAll("[data-performance-plan-edit]").forEach((textarea) => {
+    textarea.addEventListener("input", (event) => {
+      updatePerformancePlanPrompt(event.target.dataset.performancePlanEdit, event.target.value);
+      regenerateResults();
+      const expressionEditor = document.querySelector('[data-result-card-edit="microExpression"]');
+      if (expressionEditor) expressionEditor.value = getResultCard("microExpression")?.zh || "";
+    });
+  });
+
+  document.querySelectorAll("[data-copy-performance-plan]").forEach((button) => {
+    button.addEventListener("click", () => copyText(getPerformancePlanPrompt(button.dataset.copyPerformancePlan)));
+  });
+
+  document.querySelectorAll("[data-save-performance-plan]").forEach((button) => {
+    button.addEventListener("click", () => {
+      savePerformancePlanAsKnowledge(button.dataset.savePerformancePlan);
+      renderWorkbench();
+      refreshIcons();
+    });
+  });
+
   document.querySelectorAll("#aiBreakdownBtn, #topAiBreakdownBtn").forEach((aiBreakdownButton) => {
     aiBreakdownButton.addEventListener("click", async () => {
       await generateAiBreakdown();
@@ -2148,10 +2323,12 @@ function bindWorkbenchEvents() {
     input.addEventListener("input", (event) => {
       wb[key] = event.target.value;
       regenerateResults();
+      refreshPerformancePlanStaleIndicator();
     });
     input.addEventListener("change", (event) => {
       wb[key] = event.target.value;
       regenerateResults();
+      refreshPerformancePlanStaleIndicator();
     });
   });
 
@@ -2159,6 +2336,7 @@ function bindWorkbenchEvents() {
     field.addEventListener("input", (event) => {
       wb[event.target.dataset.workbenchField] = event.target.value;
       regenerateResults();
+      refreshPerformancePlanStaleIndicator();
     });
   });
 
@@ -2789,10 +2967,13 @@ function buildResultCards(payload) {
   const cameraValue = getSelectedAiBreakdownValue("cameraParams") || parameterLines.join("\n");
   const actionValue = getSelectedAiBreakdownValue("action") || wb.actionDetail || wb.action || role?.actions || "请补充人物动作。";
   const expressionBase = getSelectedAiBreakdownValue("microExpression") || wb.expressionDetail || role?.anger || "请补充微表情。";
+  const selectedPerformancePlanPrompt = getPerformancePlanPrompt();
   const selectedPerformanceActions = getSelectedPerformanceReferenceModules().map((module) => module.zh).filter(Boolean);
-  const expressionValue = selectedPerformanceActions.length
-    ? [expressionBase, ...selectedPerformanceActions.map((action, index) => `表演参考 ${index + 1}：${action}`)].join("\n")
-    : expressionBase;
+  const expressionValue = [
+    expressionBase,
+    selectedPerformancePlanPrompt ? `【人物表演方案】\n${selectedPerformancePlanPrompt}` : "",
+    ...selectedPerformanceActions.map((action, index) => `表演参考 ${index + 1}：${action}`),
+  ].filter(Boolean).join("\n");
   const lensValue = getSelectedAiBreakdownValue("cameraMotion") || project?.lensLanguage || [wb.shotSize, wb.cameraAngle, wb.composition, wb.cameraSpeed].filter(Boolean).join(" / ");
   const textureValue = getSelectedAiBreakdownValue("texture") || project?.characterTexture || wb.texture || "请补充画面质感。";
   const negativeValue = getSelectedAiBreakdownValue("negative") || negative;
@@ -3123,6 +3304,7 @@ function composePrompt(options = {}) {
         defaultAspectRatio: project.defaultAspectRatio,
       } : null,
       aiSceneBreakdown: getAiBreakdownForJson(),
+      performancePlan: getPerformancePlanForJson(),
       role: role ? { id: role.id, name: role.name, fixed: lines(role.fixed), variable: lines(role.variable), forbidden: lines(role.forbidden) } : null,
       sceneGoal: wb.sceneGoal,
       frameDescription: wb.frameDescription,
@@ -3335,6 +3517,157 @@ function getSelectedPerformanceReferenceModules() {
     .map(getPerformanceExample)
     .filter(Boolean)
     .map((example) => PERFORMANCE_DIRECTOR.exampleToReferenceModule(example));
+}
+
+function getPerformancePlanState() {
+  const wb = state.workbench;
+  if (!wb.performancePlan) wb.performancePlan = clone(DEFAULT_STATE.workbench.performancePlan);
+  wb.performancePlan.plans = Array.isArray(wb.performancePlan.plans) ? wb.performancePlan.plans : [];
+  wb.performancePlan.customPrompts = wb.performancePlan.customPrompts || {};
+  const availableIds = new Set(wb.performancePlan.plans.map((plan) => plan.id));
+  if (!availableIds.has(wb.performancePlan.selectedPlanId)) wb.performancePlan.selectedPlanId = wb.performancePlan.plans[0]?.id || "";
+  if (!availableIds.has(wb.performancePlan.lockedPlanId)) wb.performancePlan.lockedPlanId = "";
+  return wb.performancePlan;
+}
+
+function buildPerformancePlannerContext() {
+  const wb = state.workbench;
+  const role = getRole(wb.roleId);
+  const project = getActiveProject();
+  const recall = getPerformanceRecallEntries(6);
+  const selectedIds = getPerformanceRecallState().selectedIds;
+  const selectedResults = selectedIds
+    .map(getPerformanceExample)
+    .filter(Boolean)
+    .map((example) => ({ example, score: 1000, reasons: ["用户主动选择"] }));
+  const seen = new Set();
+  const recallResults = [...selectedResults, ...recall.results].filter((item) => {
+    if (seen.has(item.example.id)) return false;
+    seen.add(item.example.id);
+    return true;
+  });
+  const input = {
+    ...buildPerformanceRecallInput(),
+    brief: wb.sourceBrief || wb.sceneGoal || wb.frameDescription,
+    context: recall.context,
+    role,
+    project,
+    selectedReferenceIds: selectedIds,
+  };
+  return { input, recallResults };
+}
+
+function getCurrentPerformancePlannerSignature() {
+  return PERFORMANCE_PLANNER.createSignature(buildPerformancePlannerContext().input);
+}
+
+function refreshPerformancePlanStaleIndicator() {
+  const staleIndicator = document.querySelector(".performance-plan-stale");
+  if (!staleIndicator) return;
+  staleIndicator.hidden = getPerformancePlanState().sourceSignature === getCurrentPerformancePlannerSignature();
+}
+
+async function generatePerformancePlans() {
+  const previous = getPerformancePlanState();
+  const lockedPlan = previous.plans.find((plan) => plan.id === previous.lockedPlanId);
+  const context = buildPerformancePlannerContext();
+  const generatedPlans = await requestPerformancePlansFromModel(context);
+  const plans = lockedPlan
+    ? generatedPlans.map((plan) => plan.id === lockedPlan.id ? lockedPlan : plan)
+    : generatedPlans;
+  const availableIds = new Set(plans.map((plan) => plan.id));
+  const selectedPlanId = availableIds.has(previous.selectedPlanId)
+    ? previous.selectedPlanId
+    : plans[0]?.id || "";
+  state.workbench.performancePlan = {
+    generatedAt: new Date().toISOString(),
+    sourceSignature: PERFORMANCE_PLANNER.createSignature(context.input),
+    plans,
+    selectedPlanId: lockedPlan ? lockedPlan.id : selectedPlanId,
+    lockedPlanId: lockedPlan?.id || "",
+    customPrompts: lockedPlan && previous.customPrompts[lockedPlan.id]
+      ? { [lockedPlan.id]: previous.customPrompts[lockedPlan.id] }
+      : {},
+  };
+  saveState();
+}
+
+async function requestPerformancePlansFromModel(context) {
+  // Future API seam: send context.input and context.recallResults to a cloud model here.
+  return generateLocalPerformancePlans(context);
+}
+
+function generateLocalPerformancePlans(context) {
+  return PERFORMANCE_PLANNER.buildPlans(context.input, context.recallResults);
+}
+
+function getSelectedPerformancePlan() {
+  const plannerState = getPerformancePlanState();
+  return plannerState.plans.find((plan) => plan.id === plannerState.selectedPlanId) || null;
+}
+
+function getPerformancePlanPrompt(planId = "") {
+  const plannerState = getPerformancePlanState();
+  const id = planId || plannerState.selectedPlanId;
+  const plan = plannerState.plans.find((item) => item.id === id);
+  return plannerState.customPrompts[id] ?? plan?.prompt ?? "";
+}
+
+function selectPerformancePlan(planId) {
+  const plannerState = getPerformancePlanState();
+  if (!plannerState.plans.some((plan) => plan.id === planId)) return;
+  plannerState.selectedPlanId = planId;
+  saveState();
+}
+
+function togglePerformancePlanLock(planId) {
+  const plannerState = getPerformancePlanState();
+  if (!plannerState.plans.some((plan) => plan.id === planId)) return;
+  plannerState.lockedPlanId = plannerState.lockedPlanId === planId ? "" : planId;
+  if (plannerState.lockedPlanId) plannerState.selectedPlanId = planId;
+  saveState();
+}
+
+function updatePerformancePlanPrompt(planId, value) {
+  const plannerState = getPerformancePlanState();
+  if (!plannerState.plans.some((plan) => plan.id === planId)) return;
+  plannerState.customPrompts[planId] = value;
+  saveState();
+}
+
+function savePerformancePlanAsKnowledge(planId) {
+  const plannerState = getPerformancePlanState();
+  const plan = plannerState.plans.find((item) => item.id === planId);
+  if (!plan) {
+    showToast("没有可以保存的表演方案");
+    return;
+  }
+  const context = buildPerformancePlannerContext();
+  const payload = PERFORMANCE_PLANNER.planToKnowledgePayload(plan, context.input, getPerformancePlanPrompt(plan.id));
+  const entry = KNOWLEDGE_CORE.createEntry(payload);
+  state.knowledge.entries.unshift(entry);
+  addTags(entry.tags);
+  saveState();
+  showToast("已保存为已发布的微表情案例");
+}
+
+function getPerformancePlanForJson() {
+  const plan = getSelectedPerformancePlan();
+  if (!plan) return null;
+  return {
+    id: plan.id,
+    strategyId: plan.strategyId,
+    title: plan.title,
+    locked: getPerformancePlanState().lockedPlanId === plan.id,
+    fitScore: plan.fitScore,
+    durationSeconds: plan.durationSeconds,
+    shotSize: plan.shotSize,
+    analysis: plan.analysis,
+    beats: plan.beats,
+    channels: plan.channels,
+    prompt: getPerformancePlanPrompt(plan.id),
+    referenceIds: plan.referenceIds,
+  };
 }
 
 function getSmartRecallEntries(limit = 8) {
