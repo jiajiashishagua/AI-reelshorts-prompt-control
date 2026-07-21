@@ -5,6 +5,9 @@ const KNOWLEDGE_INGESTION = window.KnowledgeIngestion;
 const PERFORMANCE_DIRECTOR = window.PerformanceDirector;
 const PERFORMANCE_PLANNER = window.PerformancePlanner;
 const PERFORMANCE_DATA = window.PerformanceExampleData || { stats: {}, examples: [] };
+const runtimeUploads = {
+  lightingReferenceImageUrl: "",
+};
 
 const TEXT_MODEL_OPTIONS = [
   { id: "local", label: "本地专业引擎", description: "不调用API，零成本生成。", available: true },
@@ -19,6 +22,7 @@ if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION || !PERFORMANCE_DIRECTOR || !PERFORM
 
 const NAV_ITEMS = [
   { id: "workbench", label: "工作台", icon: "wand-sparkles", title: "提示词创建工作台" },
+  { id: "lighting-lab", label: "光影生成器", icon: "aperture", title: "光影提示词生成器" },
   { id: "roles", label: "角色资产", icon: "user-round-cog", title: "角色资产库" },
   { id: "modules", label: "存储库", icon: "database", title: "提示词存储库" },
   { id: "ingestion", label: "资料导入", icon: "file-up", title: "知识摄入中心" },
@@ -107,6 +111,93 @@ const OUTPUT_FORMATS = [
 ];
 
 const TARGET_TOOLS = ["RunningHub", "Image2", "Banana Pro", "即梦", "可灵", "Midjourney", "Stable Diffusion", "自定义工具"];
+
+const LIGHTING_STILL_ARCHETYPES = [
+  {
+    id: "night-window-restraint",
+    title: "夜色窗边克制对峙",
+    reference: "现代都市心理戏电影静帧",
+    searchQuery: "cinematic night window rain city interior restrained anger film still",
+    scene: "雨夜高层窗边，人物靠近玻璃，室外城市霓虹被雨水打散，室内只保留极少量柔和补光。",
+    lighting: "窗外冷蓝城市光作为主环境光，室内低照度暖灰补光轻托面部，侧逆光勾勒头发和肩线，暗部保留细节。",
+    color: "蓝黑、冷灰、少量低饱和紫灰为基底，肤色被压低但不失真，微弱暖光只作为情绪反差。",
+    camera: "ARRI Amira，Cooke 35mm S8/i，T1.4，24fps，EI 800，Log-C，白平衡约4300K，轻微欠曝0.3档。",
+    mood: "克制、压抑、秘密即将被说出口，画面有疏离感和临界爆发前的静默。",
+    palette: ["#12141b", "#293449", "#665a73", "#a6978f"],
+    tags: ["夜色", "窗边光", "克制愤怒", "城市雨夜", "冷暖对比"],
+  },
+  {
+    id: "western-dusk-road",
+    title: "西部荒漠黄昏公路",
+    reference: "美式西部公路片电影静帧",
+    searchQuery: "american western desert road golden hour side backlight film still",
+    scene: "荒漠公路、戈壁和远处低矮地平线，尘土被车尾或人物动作带起，天空保留晚霞层次。",
+    lighting: "黄金时刻低角度侧逆光，暖橙金色斜射，沙尘形成柔和丁达尔光，地面有极长阴影，天边残留蓝调时刻冷意。",
+    color: "暖橙、金黄、沙色和清冷蓝灰形成大冷暖对照，整体低饱和但高情绪密度。",
+    camera: "ARRI Amira，Cooke 35mm S8/i，T1.4，24fps，EI 800，Log-C，8500K蓝调白平衡，1:3黄昏大光比。",
+    mood: "孤寂、宿命、前路未知，温暖日落反衬荒野空旷与人物决绝。",
+    palette: ["#342316", "#b87535", "#f1b25c", "#51667d"],
+    tags: ["荒漠", "黄昏", "侧逆光", "丁达尔光", "宿命感"],
+  },
+  {
+    id: "manhattan-office-clean",
+    title: "曼哈顿高层办公室冷白柔光",
+    reference: "时尚职场电影静帧",
+    searchQuery: "manhattan fashion office afternoon window soft light film still",
+    scene: "高层办公室，大面积落地窗、玻璃、金属和浅色办公家具构成秩序化空间。",
+    lighting: "午后自然光从落地窗侧方漫射进来，明亮通透，阴影极柔，人物轮廓干净，几乎无生硬阴影。",
+    color: "冷白、米灰、浅灰为基底，深色服装形成权力感对比，低对比度且高级克制。",
+    camera: "ARRI Amira，Cooke 35mm S8/i，T1.4，24fps，ASA 800，180度快门，白平衡5500K，曝光补偿+0.3至+0.7。",
+    mood: "专业、精致、疏离、压迫，空间秩序强化人物权威。",
+    palette: ["#f1f0ec", "#c9c8c4", "#7c7d82", "#1d1c21"],
+    tags: ["办公室", "冷白", "柔光", "低对比", "时尚职场"],
+  },
+  {
+    id: "apartment-afternoon-stripes",
+    title: "美式公寓午后条状光影",
+    reference: "高档公寓室内电影静帧",
+    searchQuery: "luxury apartment afternoon window light stripes cinematic film still",
+    scene: "高档美式公寓，木地板、织物沙发、浅色墙面和复古家具构成生活化空间。",
+    lighting: "大面积高窗漫射侧方自然光，暖金色午后阳光在地板和家具上形成清晰条状光影，暗部被柔和抬起。",
+    color: "冷调灰绿、暖调米黄、复古暖棕分层，莫兰迪低饱和，绿色偏青且明亮度略高。",
+    camera: "ARRI Amira，Cooke 35mm S8/i，T1.4，24fps，ASA 800，白平衡5500K，色温4000-4800K，曝光+0.5至+1.3，高光-70至-100，阴影+20至+54。",
+    mood: "慵懒、温馨、高级，有生活痕迹但不杂乱，适合情绪松动或真相前的安静段落。",
+    palette: ["#7c8b7e", "#d8c6a7", "#9a7558", "#f2eee7"],
+    tags: ["公寓", "午后", "条状光影", "莫兰迪", "温馨高级"],
+  },
+  {
+    id: "british-estate-spring",
+    title: "英伦庄园春日通透自然光",
+    reference: "英伦古典庄园电影静帧",
+    searchQuery: "british estate spring daylight green blue film still",
+    scene: "英伦庄园草地、天空和浅色建筑，人物处于开阔自然环境中。",
+    lighting: "明亮春日自然光，柔和侧方光勾勒人物轮廓，草地反射出细碎柔和光斑，无顶光硬阴影。",
+    color: "低饱和青草绿与纯净天空蓝为大面积基底，色彩明快但保持复古胶片柔和质感。",
+    camera: "ARRI Amira，Cooke 35mm S8/i，T1.4，24fps，ASA 800，180度快门，白平衡5500K，庄园色温约5600K。",
+    mood: "清新、温润、古典、明快，适合浪漫、回忆、关系缓和或贵族质感画面。",
+    palette: ["#6d8f5d", "#a9c9e7", "#efe8d8", "#c6ab7b"],
+    tags: ["庄园", "春日", "自然光", "草地反光", "复古胶片"],
+  },
+  {
+    id: "candle-interior-gothic",
+    title: "烛光暗室高反差私密谈判",
+    reference: "哥特室内悬疑电影静帧",
+    searchQuery: "candlelit dark interior high contrast close up film still",
+    scene: "深色室内、木质墙面、烛台或壁灯作为可见光源，背景被压入阴影。",
+    lighting: "低位暖烛光从侧前方照亮面部局部，眼窝和颧骨形成浓重阴影，背景保留极少轮廓光。",
+    color: "深棕、黑灰、暗金构成主调，饱和度低，高光小而集中，暗部有细节但不提亮过度。",
+    camera: "ARRI Amira，Cooke 35mm S8/i，T1.4，24fps，EI 800，Log-C，白平衡3200K，1:4高反差。",
+    mood: "秘密、危险、压迫、欲言又止，适合谈判、背叛、真相揭露和权力反转。",
+    palette: ["#100d0c", "#3b2a22", "#9c7142", "#d2b482"],
+    tags: ["烛光", "暗室", "高反差", "悬疑", "私密"],
+  },
+];
+
+const LIGHTING_EXTRACTION_TONES = [
+  { id: "faithful", title: "精准复刻型", fit: "最大程度贴近参考静帧，适合需要统一项目光影风格。" },
+  { id: "narrative", title: "叙事强化型", fit: "保留静帧光影逻辑，同时更强调剧情情绪和人物关系。" },
+  { id: "clean", title: "模型友好型", fit: "降低复杂参数密度，让生成模型更稳定、更不容易跑偏。" },
+];
 
 const IMAGE_TASKS = [
   "完整图片提示词",
@@ -253,6 +344,21 @@ const DEFAULT_STATE = {
     moduleQuickTypeIds: DEFAULT_MODULE_QUICK_TYPES,
   },
   activeProjectId: "project-default-cinematic",
+  lightingLab: {
+    sourceBrief: "女主在夜色窗边压住愤怒，准备说出真相。",
+    requirement: "需要高级电影感窗边光，冷暖克制，提取可用于视频首帧和后续镜头统一的光影提示词。",
+    referenceImageName: "",
+    targetModel: "deepseek-v4-flash",
+    aspectRatio: "9:16",
+    searchStatus: "idle",
+    extractionStatus: "idle",
+    stills: [],
+    selectedStillId: "",
+    extracts: [],
+    selectedExtractId: "",
+    finalPrompt: "",
+    generatedAt: "",
+  },
   workbench: {
     mode: "video",
     imageTask: "完整图片提示词",
@@ -1009,6 +1115,12 @@ function mergeState(base, saved) {
     ...saved,
     activeProjectId,
     preferences: { ...base.preferences, ...(saved.preferences || {}) },
+    lightingLab: {
+      ...base.lightingLab,
+      ...(saved.lightingLab || {}),
+      stills: Array.isArray(saved.lightingLab?.stills) ? saved.lightingLab.stills : base.lightingLab.stills,
+      extracts: Array.isArray(saved.lightingLab?.extracts) ? saved.lightingLab.extracts : base.lightingLab.extracts,
+    },
     workbench: {
       ...base.workbench,
       ...savedWorkbench,
@@ -1188,11 +1300,12 @@ function renderNav() {
 function render() {
   const item = NAV_ITEMS.find((entry) => entry.id === state.activeView) || NAV_ITEMS[0];
   const mode = getWorkbenchMode();
-  document.body.classList.toggle("simple-workbench-mode", state.activeView === "workbench");
+  document.body.classList.toggle("simple-workbench-mode", state.activeView === "workbench" || state.activeView === "lighting-lab");
   dom.pageTitle.textContent = state.activeView === "workbench" ? mode.title : item.title;
   renderNav();
 
   if (state.activeView === "workbench") renderWorkbench();
+  if (state.activeView === "lighting-lab") renderLightingLab();
   if (state.activeView === "roles") renderRoles();
   if (state.activeView === "modules") renderModules();
   if (state.activeView === "ingestion") renderIngestion();
@@ -1260,6 +1373,191 @@ function renderWorkbench() {
   bindWorkbenchEvents();
 }
 
+function renderLightingLab() {
+  const lab = getLightingLabState();
+  const project = getActiveProject();
+  const selectedStill = getLightingStill(lab.selectedStillId);
+  const selectedExtract = getLightingExtract(lab.selectedExtractId);
+  dom.view.innerHTML = `
+    <div class="simple-generator-page lighting-lab-page">
+      ${renderSimpleGeneratorHeader()}
+      <section class="simple-generator lighting-lab">
+        <p class="eyebrow">Lighting Prompt Lab</p>
+        <h2>光影提示词生成器</h2>
+        <p class="lighting-lab-subtitle">上传参考图，输入剧情和需求，先筛选贴近需求的电影静帧方向，再提取光影、氛围、色彩和相机参数，最终组合成可直接使用的光影提示词。</p>
+
+        <section class="lighting-lab-card lighting-brief-card">
+          <div class="lighting-upload-preview ${runtimeUploads.lightingReferenceImageUrl ? "has-image" : ""}">
+            ${runtimeUploads.lightingReferenceImageUrl
+              ? `<img src="${escapeHtml(runtimeUploads.lightingReferenceImageUrl)}" alt="已上传参考图预览" />`
+              : `<div><i data-lucide="image-up"></i><span>上传场景图 / 静帧参考</span></div>`}
+          </div>
+          <div class="lighting-brief-fields">
+            <label class="simple-control">
+              <span>剧情或画面描述</span>
+              <textarea id="lightingSourceBrief" class="lighting-textarea" placeholder="例如：女主在夜色窗边压住愤怒，准备说出真相。">${escapeHtml(lab.sourceBrief || "")}</textarea>
+            </label>
+            <label class="simple-control">
+              <span>光影需求</span>
+              <textarea id="lightingRequirement" class="lighting-textarea compact" placeholder="例如：高级电影感窗边光，冷暖克制，适合视频首帧。">${escapeHtml(lab.requirement || "")}</textarea>
+            </label>
+            <div class="lighting-control-grid">
+              <label class="simple-control">
+                <span>当前项目</span>
+                <select id="lightingProjectSelect">
+                  ${state.projects.map((item) => `<option value="${item.id}" ${item.id === state.activeProjectId ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+                </select>
+              </label>
+              <label class="simple-control">
+                <span>模型</span>
+                <select id="lightingModelSelect">
+                  ${TEXT_MODEL_OPTIONS.map((model) => `<option value="${model.id}" ${lab.targetModel === model.id ? "selected" : ""} ${model.available ? "" : "disabled"}>${escapeHtml(model.label)}</option>`).join("")}
+                </select>
+              </label>
+              <label class="simple-control">
+                <span>比例</span>
+                <select id="lightingAspectRatio">
+                  ${PARAMETER_GROUPS[0].options.map((item) => `<option value="${item}" ${lab.aspectRatio === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                </select>
+              </label>
+              <label class="pf-button pf-secondary lighting-upload-button" for="lightingReferenceImage">
+                <i data-lucide="upload"></i>
+                上传图片
+              </label>
+              <input id="lightingReferenceImage" type="file" accept="image/*" hidden />
+            </div>
+            <div class="lighting-button-row">
+              <button class="pf-button pf-primary" type="button" id="lightingSearchBtn">
+                <i data-lucide="search"></i>
+                搜索电影静帧
+              </button>
+              <button class="pf-outline" type="button" id="lightingExtractBtn" ${selectedStill ? "" : "disabled"}>
+                <i data-lucide="aperture"></i>
+                提取光影方案
+              </button>
+              <button class="pf-outline" type="button" id="lightingResetBtn">
+                <i data-lucide="rotate-ccw"></i>
+                重置
+              </button>
+            </div>
+            <p class="simple-file-note">${lab.referenceImageName ? `已选择参考图：${escapeHtml(lab.referenceImageName)}` : "未上传图片时，系统会只根据剧情和需求召回静帧方向。"}</p>
+          </div>
+        </section>
+
+        <section class="lighting-workflow-grid">
+          <div class="lighting-lab-card">
+            <div class="lighting-section-head">
+              <div>
+                <p class="eyebrow">Step 1</p>
+                <h3>电影静帧候选</h3>
+              </div>
+              <span>${lab.stills.length ? `${lab.stills.length} 个候选` : "等待搜索"}</span>
+            </div>
+            ${renderLightingStillCandidates(lab)}
+          </div>
+
+          <div class="lighting-lab-card">
+            <div class="lighting-section-head">
+              <div>
+                <p class="eyebrow">Step 2</p>
+                <h3>光影提取方案</h3>
+              </div>
+              <span>${selectedStill ? escapeHtml(selectedStill.title) : "先选择静帧"}</span>
+            </div>
+            ${renderLightingExtractOptions(lab)}
+          </div>
+        </section>
+
+        <section class="lighting-lab-card lighting-final-card">
+          <div class="lighting-section-head">
+            <div>
+              <p class="eyebrow">Step 3</p>
+              <h3>最终光影提示词</h3>
+            </div>
+            <div class="lighting-final-actions">
+              <button class="pf-outline compact-project-button" type="button" id="lightingCopyBtn" ${lab.finalPrompt ? "" : "disabled"}><i data-lucide="copy"></i>复制</button>
+              <button class="pf-outline compact-project-button" type="button" id="lightingSaveKnowledgeBtn" ${lab.finalPrompt ? "" : "disabled"}><i data-lucide="database"></i>存入光影资产</button>
+              <button class="pf-button pf-primary compact-project-button" type="button" id="lightingComposeBtn" ${selectedExtract ? "" : "disabled"}><i data-lucide="wand-sparkles"></i>生成最终版</button>
+            </div>
+          </div>
+          <textarea id="lightingFinalPrompt" class="lighting-final-textarea" placeholder="选择光影方案后，点击生成最终版。">${escapeHtml(lab.finalPrompt || "")}</textarea>
+          ${selectedExtract ? `<p class="lighting-selected-note">当前采用：${escapeHtml(selectedExtract.title)} / ${escapeHtml(selectedExtract.fit)}</p>` : ""}
+        </section>
+      </section>
+    </div>
+  `;
+
+  bindLightingLabEvents();
+}
+
+function renderLightingStillCandidates(lab) {
+  if (!lab.stills.length) {
+    return `<div class="lighting-empty-state">
+      <i data-lucide="film"></i>
+      <strong>还没有静帧候选</strong>
+      <span>点击“搜索电影静帧”后，会根据剧情、上传图片名称、项目母版和光影需求生成可选择的参考方向。</span>
+    </div>`;
+  }
+  return `<div class="lighting-still-grid">
+    ${lab.stills.map((still) => {
+      const selected = still.id === lab.selectedStillId;
+      const style = `background: linear-gradient(135deg, ${still.palette.join(", ")});`;
+      return `
+        <article class="lighting-still-card ${selected ? "is-selected" : ""}">
+          <div class="lighting-still-thumb" style="${style}">
+            <span>${escapeHtml(still.reference)}</span>
+          </div>
+          <div class="lighting-still-body">
+            <strong>${escapeHtml(still.title)}</strong>
+            <p>${escapeHtml(still.scene)}</p>
+            <div class="lighting-tags">${still.tags.slice(0, 5).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
+            <div class="lighting-card-actions">
+              <button class="pf-outline compact-project-button" type="button" data-open-still-search="${escapeHtml(still.searchUrl)}"><i data-lucide="external-link"></i>打开搜索</button>
+              <button class="pf-button pf-primary compact-project-button" type="button" data-select-lighting-still="${escapeHtml(still.id)}">${selected ? "已选择" : "选择并提取"}</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join("")}
+  </div>`;
+}
+
+function renderLightingExtractOptions(lab) {
+  if (!lab.selectedStillId) {
+    return `<div class="lighting-empty-state">
+      <i data-lucide="mouse-pointer-square"></i>
+      <strong>请选择一个静帧方向</strong>
+      <span>选择后会自动生成 3 个不同侧重点的光影提取方案。</span>
+    </div>`;
+  }
+  if (!lab.extracts.length) {
+    return `<div class="lighting-empty-state">
+      <i data-lucide="aperture"></i>
+      <strong>等待提取</strong>
+      <span>点击“提取光影方案”，系统会按光影氛围、色彩逻辑、曝光调色和相机参数拆解。</span>
+    </div>`;
+  }
+  return `<div class="lighting-extract-list">
+    ${lab.extracts.map((option) => `
+      <article class="lighting-extract-card ${option.id === lab.selectedExtractId ? "is-selected" : ""}">
+        <div class="lighting-extract-head">
+          <div>
+            <strong>${escapeHtml(option.title)}</strong>
+            <span>${escapeHtml(option.fit)}</span>
+          </div>
+          <button class="pf-button pf-primary compact-project-button" type="button" data-select-lighting-extract="${escapeHtml(option.id)}">${option.id === lab.selectedExtractId ? "已采用" : "采用"}</button>
+        </div>
+        <dl>
+          <div><dt>光影</dt><dd>${escapeHtml(option.sections.lightingAtmosphere)}</dd></div>
+          <div><dt>色彩</dt><dd>${escapeHtml(option.sections.colorLogic)}</dd></div>
+          <div><dt>相机</dt><dd>${escapeHtml(option.sections.cameraParams)}</dd></div>
+          <div><dt>叙事</dt><dd>${escapeHtml(option.sections.narrativeMood)}</dd></div>
+        </dl>
+      </article>
+    `).join("")}
+  </div>`;
+}
+
 function renderSimpleGeneratorHeader() {
   return `
     <header class="simple-generator-header">
@@ -1268,6 +1566,7 @@ function renderSimpleGeneratorHeader() {
         <strong>提示词<span>控制台</span></strong>
       </a>
       <nav>
+        <a href="#lighting-lab">光影生成器</a>
         <a href="#roles">角色资产</a>
         <a href="#modules">存储库</a>
         <a href="#presets">提示词库</a>
@@ -2576,6 +2875,377 @@ function bindWorkbenchEvents() {
     renderWorkbench();
     showToast("工作台已恢复为示例配置");
   });
+}
+
+function bindLightingLabEvents() {
+  const lab = getLightingLabState();
+
+  const simpleThemeButton = document.getElementById("simpleThemeBtn");
+  if (simpleThemeButton) {
+    simpleThemeButton.addEventListener("click", () => {
+      state.theme = state.theme === "dark" ? "light" : "dark";
+      document.body.classList.toggle("dark", state.theme === "dark");
+      saveState();
+      renderLightingLab();
+      refreshIcons();
+    });
+  }
+
+  const simpleExportButton = document.getElementById("simpleExportBtn");
+  if (simpleExportButton) simpleExportButton.addEventListener("click", exportData);
+
+  const headerGenerateButton = document.getElementById("generatePromptBtn");
+  if (headerGenerateButton) headerGenerateButton.addEventListener("click", () => {
+    composeLightingFinalPromptFromSelection();
+    renderLightingLab();
+    refreshIcons();
+  });
+
+  const projectSelect = document.getElementById("lightingProjectSelect");
+  if (projectSelect) {
+    projectSelect.addEventListener("change", (event) => {
+      state.activeProjectId = event.target.value;
+      saveState();
+      renderLightingLab();
+      refreshIcons();
+      showToast("已切换项目风格母版");
+    });
+  }
+
+  const modelSelect = document.getElementById("lightingModelSelect");
+  if (modelSelect) modelSelect.addEventListener("change", (event) => {
+    lab.targetModel = event.target.value;
+    saveState();
+  });
+
+  const aspectSelect = document.getElementById("lightingAspectRatio");
+  if (aspectSelect) aspectSelect.addEventListener("change", (event) => {
+    lab.aspectRatio = event.target.value;
+    saveState();
+  });
+
+  const sourceBrief = document.getElementById("lightingSourceBrief");
+  if (sourceBrief) sourceBrief.addEventListener("input", (event) => {
+    lab.sourceBrief = event.target.value;
+    saveState();
+  });
+
+  const requirement = document.getElementById("lightingRequirement");
+  if (requirement) requirement.addEventListener("input", (event) => {
+    lab.requirement = event.target.value;
+    saveState();
+  });
+
+  const imageInput = document.getElementById("lightingReferenceImage");
+  if (imageInput) {
+    imageInput.addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
+      lab.referenceImageName = file ? file.name : "";
+      if (!file) {
+        runtimeUploads.lightingReferenceImageUrl = "";
+        saveState();
+        renderLightingLab();
+        refreshIcons();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        runtimeUploads.lightingReferenceImageUrl = String(reader.result || "");
+        saveState();
+        renderLightingLab();
+        refreshIcons();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const searchButton = document.getElementById("lightingSearchBtn");
+  if (searchButton) searchButton.addEventListener("click", async () => {
+    lab.searchStatus = "loading";
+    saveState();
+    renderLightingLab();
+    refreshIcons();
+    await generateLightingStillCandidates();
+    renderLightingLab();
+    refreshIcons();
+    showToast("已生成电影静帧候选");
+  });
+
+  const extractButton = document.getElementById("lightingExtractBtn");
+  if (extractButton) extractButton.addEventListener("click", async () => {
+    await extractLightingFromSelectedStill();
+    renderLightingLab();
+    refreshIcons();
+    showToast("已提取光影方案");
+  });
+
+  document.querySelectorAll("[data-open-still-search]").forEach((button) => {
+    button.addEventListener("click", () => window.open(button.dataset.openStillSearch, "_blank", "noopener,noreferrer"));
+  });
+
+  document.querySelectorAll("[data-select-lighting-still]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      lab.selectedStillId = button.dataset.selectLightingStill;
+      lab.selectedExtractId = "";
+      lab.finalPrompt = "";
+      await extractLightingFromSelectedStill();
+      renderLightingLab();
+      refreshIcons();
+      showToast("已选择静帧并提取光影");
+    });
+  });
+
+  document.querySelectorAll("[data-select-lighting-extract]").forEach((button) => {
+    button.addEventListener("click", () => {
+      lab.selectedExtractId = button.dataset.selectLightingExtract;
+      composeLightingFinalPromptFromSelection();
+      renderLightingLab();
+      refreshIcons();
+      showToast("已采用该光影方案");
+    });
+  });
+
+  const finalPrompt = document.getElementById("lightingFinalPrompt");
+  if (finalPrompt) finalPrompt.addEventListener("input", (event) => {
+    lab.finalPrompt = event.target.value;
+    saveState();
+  });
+
+  const composeButton = document.getElementById("lightingComposeBtn");
+  if (composeButton) composeButton.addEventListener("click", () => {
+    composeLightingFinalPromptFromSelection();
+    renderLightingLab();
+    refreshIcons();
+    showToast("已生成最终光影提示词");
+  });
+
+  const copyButton = document.getElementById("lightingCopyBtn");
+  if (copyButton) copyButton.addEventListener("click", () => copyText(lab.finalPrompt));
+
+  const saveButton = document.getElementById("lightingSaveKnowledgeBtn");
+  if (saveButton) saveButton.addEventListener("click", () => {
+    saveLightingPromptAsKnowledge();
+    renderLightingLab();
+    refreshIcons();
+  });
+
+  const resetButton = document.getElementById("lightingResetBtn");
+  if (resetButton) resetButton.addEventListener("click", () => {
+    state.lightingLab = clone(DEFAULT_STATE.lightingLab);
+    runtimeUploads.lightingReferenceImageUrl = "";
+    saveState();
+    renderLightingLab();
+    refreshIcons();
+    showToast("光影生成器已重置");
+  });
+}
+
+function getLightingLabState() {
+  if (!state.lightingLab) state.lightingLab = clone(DEFAULT_STATE.lightingLab);
+  state.lightingLab.stills = Array.isArray(state.lightingLab.stills) ? state.lightingLab.stills : [];
+  state.lightingLab.extracts = Array.isArray(state.lightingLab.extracts) ? state.lightingLab.extracts : [];
+  return state.lightingLab;
+}
+
+async function generateLightingStillCandidates() {
+  const lab = getLightingLabState();
+  const context = buildLightingSearchContext();
+  lab.stills = await requestFilmStillCandidates(context);
+  lab.selectedStillId = "";
+  lab.extracts = [];
+  lab.selectedExtractId = "";
+  lab.finalPrompt = "";
+  lab.searchStatus = "ready";
+  lab.generatedAt = new Date().toISOString();
+  saveState();
+}
+
+async function requestFilmStillCandidates(context) {
+  // Later this can call a backend image-search API and return real still URLs.
+  return generateLocalFilmStillCandidates(context);
+}
+
+function buildLightingSearchContext() {
+  const lab = getLightingLabState();
+  return {
+    sourceBrief: lab.sourceBrief || "",
+    requirement: lab.requirement || "",
+    referenceImageName: lab.referenceImageName || "",
+    project: getActiveProject(),
+    aspectRatio: lab.aspectRatio,
+    model: getTextModelOption(lab.targetModel),
+  };
+}
+
+function generateLocalFilmStillCandidates(context) {
+  const haystack = [
+    context.sourceBrief,
+    context.requirement,
+    context.referenceImageName,
+    context.project?.visualTone,
+    context.project?.lightingPreference,
+  ].filter(Boolean).join(" ").toLowerCase();
+  const scored = LIGHTING_STILL_ARCHETYPES.map((still) => {
+    const score = still.tags.reduce((total, tag) => total + (haystack.includes(tag.toLowerCase()) ? 6 : 0), 0)
+      + still.searchQuery.split(/\s+/).reduce((total, word) => total + (haystack.includes(word) ? 1 : 0), 0)
+      + getLightingKeywordScore(still, haystack);
+    return { still, score };
+  }).sort((a, b) => b.score - a.score);
+  return scored.slice(0, 5).map(({ still }) => ({
+    ...clone(still),
+    id: `lighting-still:${still.id}`,
+    searchUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(still.searchQuery)}`,
+  }));
+}
+
+function getLightingKeywordScore(still, text) {
+  const rules = [
+    [["夜", "窗", "雨", "愤怒", "真相", "压住"], "night-window-restraint", 18],
+    [["荒漠", "公路", "黄昏", "沙尘", "西部"], "western-dusk-road", 16],
+    [["办公室", "职场", "时尚", "高层"], "manhattan-office-clean", 16],
+    [["公寓", "午后", "条状", "温馨"], "apartment-afternoon-stripes", 16],
+    [["庄园", "草地", "春日", "英伦"], "british-estate-spring", 16],
+    [["烛光", "暗室", "谈判", "悬疑"], "candle-interior-gothic", 16],
+  ];
+  return rules.reduce((score, [words, id, weight]) => {
+    if (still.id !== id) return score;
+    const hits = words.filter((word) => text.includes(word)).length;
+    return score + hits * weight;
+  }, 0);
+}
+
+async function extractLightingFromSelectedStill() {
+  const lab = getLightingLabState();
+  const still = getLightingStill(lab.selectedStillId);
+  if (!still) return;
+  lab.extractionStatus = "loading";
+  lab.extracts = await requestLightingExtractionFromModel(still, buildLightingSearchContext());
+  lab.selectedExtractId = lab.extracts[0]?.id || "";
+  lab.extractionStatus = "ready";
+  composeLightingFinalPromptFromSelection();
+  saveState();
+}
+
+async function requestLightingExtractionFromModel(still, context) {
+  // Later this can call a vision model with the uploaded image and selected still.
+  return generateLocalLightingExtracts(still, context);
+}
+
+function generateLocalLightingExtracts(still, context) {
+  return LIGHTING_EXTRACTION_TONES.map((tone) => {
+    const sections = buildLightingSections(still, tone, context);
+    return {
+      id: `lighting-extract:${still.id}:${tone.id}`,
+      title: tone.title,
+      fit: tone.fit,
+      toneId: tone.id,
+      sections,
+    };
+  });
+}
+
+function buildLightingSections(still, tone, context) {
+  const project = context.project || {};
+  const requirement = context.requirement || "保持高级电影感和真实物理细节。";
+  const sourceBrief = context.sourceBrief || "当前画面";
+  const tonePrefix = {
+    faithful: "严格复刻参考静帧的光源结构与明暗关系，",
+    narrative: "在参考静帧基础上强化剧情情绪，",
+    clean: "保留核心光影指令并降低冗余参数，",
+  }[tone.id] || "";
+  return {
+    lightingAtmosphere: `${tonePrefix}${still.lighting}结合需求“${requirement}”，让主光方向、阴影形态和环境反射光都服务于“${sourceBrief}”。`,
+    colorLogic: `${still.color}${project.colorLogic ? `；同时遵循项目色彩逻辑：${project.colorLogic}` : ""}`,
+    exposureGrading: buildExposureGrading(still, tone.id),
+    sceneAtmosphere: `${still.scene}构图保持${context.aspectRatio || "9:16"}竖屏友好，空间层次清晰，电影级景深，写实剧照质感，保留细腻胶片颗粒。`,
+    narrativeMood: `${still.mood}当前剧情重点是：${sourceBrief}。光影需要让人物状态先被压住，再露出即将爆发或揭露的张力。`,
+    cameraParams: still.camera,
+    globalTexture: "写实真人电影画质；raw photo, film grain, 8K, no CGI, no rendering, no smooth surface；皮肤保留真实纹理，暗部细节完整，避免廉价网感。",
+    negative: `${project.defaultNegative || "不要CGI感，不要渲染感，不要塑料皮肤，不要过度柔焦，不要低清晰度，不要生硬阴影，不要文字水印。"} 不要让光影抢过人物情绪，不要把画面做成过曝网红滤镜。`,
+  };
+}
+
+function buildExposureGrading(still, toneId) {
+  if (still.id.includes("night-window")) {
+    return toneId === "clean"
+      ? "色温约3800-4500K，冷蓝窗外光为主，室内暖灰补光极弱，整体轻微欠曝，保留眼神高光和暗部轮廓。"
+      : "白平衡约4300K，整体曝光-0.3档，冷蓝环境光占70%，暖灰室内补光占30%；高光压低避免霓虹过曝，阴影保持+15至+30的可见细节，清晰度适度降低减少数码锐感。";
+  }
+  if (still.id.includes("western")) return "8500K蓝调时刻白平衡，暖橙金色低角度侧逆光，1:3黄昏大光比，暗部完整，高光不过曝，沙尘边缘带柔和光晕。";
+  if (still.id.includes("office")) return "白平衡5500K，曝光补偿+0.3至+0.7，低对比度，柔和高光，细腻阴影，冷白光影保持干净通透。";
+  if (still.id.includes("apartment")) return "色温4000-4800K，曝光+0.5至+1.3，对比度大幅降低，高光-70至-100，阴影+20至+54，饱和度微降，绿色偏青且提高明亮度。";
+  if (still.id.includes("estate")) return "庄园色温约5600K，明亮自然光，低对比复古胶片质感，高光柔和，草地反光轻微抬亮人物暗面。";
+  return "白平衡约3200K，低位暖光，高反差，曝光谨慎压暗背景，高光集中在眼神、颧骨和手部，暗部保留少量轮廓。";
+}
+
+function composeLightingFinalPromptFromSelection() {
+  const lab = getLightingLabState();
+  const still = getLightingStill(lab.selectedStillId);
+  const option = getLightingExtract(lab.selectedExtractId);
+  if (!still || !option) {
+    showToast("请先选择静帧和光影方案");
+    return;
+  }
+  const project = getActiveProject();
+  const sections = option.sections;
+  lab.finalPrompt = [
+    `【创作需求】${lab.sourceBrief || "当前画面"}${lab.requirement ? `；补充要求：${lab.requirement}` : ""}`,
+    `【参考电影静帧】${still.title}；参考方向：${still.reference}；搜索关键词：${still.searchQuery}${lab.referenceImageName ? `；用户上传参考图：${lab.referenceImageName}` : ""}`,
+    `【项目风格母版】${project ? renderProjectStyleMaster(project, "zh").replace(/\n+/g, "；") : "使用当前默认高级短剧风格。"}`,
+    `【光影氛围】${sections.lightingAtmosphere}`,
+    `【色彩逻辑】${sections.colorLogic}`,
+    `【曝光与调色】${sections.exposureGrading}`,
+    `【场景氛围】${sections.sceneAtmosphere}`,
+    `【叙事氛围】${sections.narrativeMood}`,
+    `【电影机参数】${sections.cameraParams}；记录格式：ProRes 4444 XQ / ARRIRAW。`,
+    `【全局质感】${sections.globalTexture}`,
+    `【负面约束】${sections.negative}`,
+  ].join("\n");
+  lab.generatedAt = new Date().toISOString();
+  saveState();
+}
+
+function saveLightingPromptAsKnowledge() {
+  const lab = getLightingLabState();
+  const still = getLightingStill(lab.selectedStillId);
+  const option = getLightingExtract(lab.selectedExtractId);
+  if (!lab.finalPrompt || !still || !option) {
+    showToast("没有可以保存的光影提示词");
+    return;
+  }
+  const entry = KNOWLEDGE_CORE.createEntry({
+    libraryType: "lighting",
+    title: `${still.title} / ${option.title}`,
+    summary: option.sections.lightingAtmosphere,
+    contentZh: lab.finalPrompt,
+    contentEn: "",
+    tags: unique(["光影资产", "电影静帧提取", ...still.tags, option.title]),
+    scenarios: [lab.sourceBrief || still.scene],
+    structuredData: {
+      stillReference: still.title,
+      extractionMode: option.title,
+      lightingAtmosphere: option.sections.lightingAtmosphere,
+      colorLogic: option.sections.colorLogic,
+      exposureGrading: option.sections.exposureGrading,
+      cameraParams: option.sections.cameraParams,
+      narrativeMood: option.sections.narrativeMood,
+    },
+    confidence: 0.86,
+    status: "published",
+    notes: "由光影提示词生成器保存，可在工作台智能召回。",
+  });
+  state.knowledge.entries.unshift(entry);
+  addTags(entry.tags);
+  saveState();
+  showToast("已保存到光影资产");
+}
+
+function getLightingStill(id) {
+  return getLightingLabState().stills.find((item) => item.id === id) || null;
+}
+
+function getLightingExtract(id) {
+  return getLightingLabState().extracts.find((item) => item.id === id) || null;
 }
 
 function applyQuickOptimize(id) {
