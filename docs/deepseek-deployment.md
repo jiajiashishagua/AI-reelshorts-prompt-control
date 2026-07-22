@@ -27,6 +27,9 @@ npx wrangler dev
 
 ```dotenv
 DEEPSEEK_API_KEY=替换为你的密钥
+SERPAPI_API_KEY=可选，用于光影生成器联网搜索电影静帧
+BING_IMAGE_SEARCH_KEY=可选，用于光影生成器联网搜索电影静帧
+BING_IMAGE_SEARCH_ENDPOINT=https://api.bing.microsoft.com/v7.0/images/search
 ```
 
 不要把密钥写入 `PromptControlConfig`、`script.js`、HTML 或 Git 仓库。
@@ -62,6 +65,8 @@ window.PromptControlConfig = Object.freeze({
 - `GET /health`：检查服务状态与当前可用模型。
 - `GET /api/models`：返回工作台可选择的云端模型。
 - `POST /api/performance-plans`：根据剧情、角色、项目风格和召回案例生成三套人物表演方案。
+- `POST /api/lighting/search-references`：根据场景图状态、剧本和需求，生成 5 个电影静帧搜索候选；配置图片搜索 Secret 后返回真实缩略图。
+- `POST /api/lighting/compose-prompt`：根据用户选中的参考图、光影方向和参数强度生成最终光影提示词。
 
 云端请求失败、超时或返回结构不合格时，网页会自动回退到本地规则生成，并在结果区显示回退原因。
 
@@ -96,5 +101,21 @@ Pages 项目轮换 Secret：
 cd worker
 npx wrangler pages secret put DEEPSEEK_API_KEY --project-name prompt-control-deepseek-api
 ```
+
+光影生成器如果要显示真实电影静帧缩略图，还需要额外配置一个图片搜索服务，二选一即可：
+
+```powershell
+cd worker
+npx wrangler pages secret put SERPAPI_API_KEY --project-name prompt-control-deepseek-api
+```
+
+或：
+
+```powershell
+cd worker
+npx wrangler pages secret put BING_IMAGE_SEARCH_KEY --project-name prompt-control-deepseek-api
+```
+
+未配置图片搜索 Secret 时，接口仍会返回 5 个可点击的 Google 图片搜索候选链接，页面不会中断。
 
 Secret 更新后不需要修改网页代码。旧密钥确认停用前，应先调用 `/health` 并完成一次真实生成测试。

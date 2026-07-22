@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import {
+  buildFallbackLightingSearchPlan,
   buildDeepSeekRequest,
   handleRequest,
+  renderFallbackLightingPrompt,
+  sanitizeLightingContext,
   sanitizePerformanceContext,
 } from "../worker/src/index.mjs";
 
@@ -159,5 +162,107 @@ const invalidModelResponse = await handleRequest(new Request("https://worker.exa
   body: JSON.stringify({ model: "deepseek-v3", context }),
 }), env, mockFetch);
 assert.equal(invalidModelResponse.status, 400);
+
+const lightingContext = sanitizeLightingContext({
+  sourceBrief: "女主在夜色窗边压住愤怒，准备说出真相。",
+  requirement: "需要暗黑、压抑、窗边冷光和克制怒意。",
+  referenceImageName: "window-night.png",
+  referenceImageUploaded: true,
+  selectedDirection: "darker",
+  selectedIntensity: "strong",
+  parameterControls: {
+    exposure: "darker",
+    shadow: "heavy",
+    atmosphere: "dense",
+  },
+  project: {
+    name: "暗黑中世纪短剧",
+    visualTone: "写实真人电影质感",
+    colorLogic: "冷灰色调为主，烛光作为暖点。",
+    lightingPreference: "深阴影、体积光、窗边侧逆光。",
+    defaultNegative: "不要CGI感，不要过度柔焦。",
+  },
+});
+assert.equal(lightingContext.selectedDirection, "darker");
+assert.equal(lightingContext.selectedIntensity, "strong");
+assert.equal(lightingContext.parameterSummary, "明暗更暗 / 强阴影 / 空气感强烈");
+
+const fallbackSearchPlan = buildFallbackLightingSearchPlan(lightingContext);
+assert.equal(fallbackSearchPlan.queries.length, 5);
+assert.ok(fallbackSearchPlan.analysis.keywords.length >= 1);
+
+const fallbackLightingPrompt = renderFallbackLightingPrompt({
+  ...lightingContext,
+  selectedReference: {
+    title: "主参考候选",
+    searchQuery: "cinematic night window lighting film still",
+    reason: "匹配夜色窗边的冷光与压抑氛围。",
+  },
+});
+assert.match(fallbackLightingPrompt, /【电影机参数】/);
+assert.match(fallbackLightingPrompt, /参数控制/);
+
+const lightingSearchPayload = {
+  analysis: {
+    summary: "适合寻找夜色窗边、冷光、深阴影的电影静帧。",
+    keywords: ["夜色", "窗边光", "压抑", "克制愤怒"],
+  },
+  queries: [
+    { title: "主参考", query: "night window cinematic film still", reason: "匹配主光方向", direction: "窗边冷光", mood: "压抑", tags: ["夜色"] },
+    { title: "阴影参考", query: "deep shadow interior film still", reason: "匹配深阴影", direction: "深阴影", mood: "暗黑", tags: ["阴影"] },
+    { title: "色彩参考", query: "cold blue warm practical light film still", reason: "匹配冷暖关系", direction: "冷暖对比", mood: "克制", tags: ["冷暖"] },
+    { title: "空间参考", query: "window interior cinematic depth film still", reason: "匹配空间纵深", direction: "空间纵深", mood: "孤独", tags: ["空间"] },
+    { title: "氛围参考", query: "restrained anger cinematic lighting film still", reason: "匹配叙事情绪", direction: "情绪光影", mood: "愤怒", tags: ["情绪"] },
+  ],
+};
+let lightingUpstreamRequest;
+const lightingMockFetch = async (url, options = {}) => {
+  lightingUpstreamRequest = { url, options, body: options.body ? JSON.parse(options.body) : null };
+  return new Response(JSON.stringify({
+    id: "lighting-chat-test",
+    choices: [{ message: { content: JSON.stringify(lightingSearchPayload) } }],
+    usage: { prompt_tokens: 50, completion_tokens: 80, total_tokens: 130 },
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+};
+
+const lightingSearchResponse = await handleRequest(new Request("https://worker.example/api/lighting/search-references", {
+  method: "POST",
+  headers: { Origin: origin, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    model: "deepseek-v4-flash",
+    context: lightingContext,
+  }),
+}), env, lightingMockFetch);
+assert.equal(lightingSearchResponse.status, 200);
+const lightingSearchBody = await lightingSearchResponse.json();
+assert.equal(lightingSearchBody.references.length, 5);
+assert.equal(lightingSearchBody.meta.imageSearchProvider, "placeholder");
+assert.equal(lightingUpstreamRequest.body.response_format.type, "json_object");
+
+const lightingComposePayload = {
+  prompt: "【创作需求】女主在夜色窗边压住愤怒，准备说出真相。\n【电影机参数】ARRI Amira，24fps，Cooke 35mm，T1.4。",
+};
+const lightingComposeMockFetch = async () => new Response(JSON.stringify({
+  id: "lighting-compose-test",
+  choices: [{ message: { content: JSON.stringify(lightingComposePayload) } }],
+  usage: { prompt_tokens: 70, completion_tokens: 90, total_tokens: 160 },
+}), { status: 200, headers: { "Content-Type": "application/json" } });
+
+const lightingComposeResponse = await handleRequest(new Request("https://worker.example/api/lighting/compose-prompt", {
+  method: "POST",
+  headers: { Origin: origin, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    model: "deepseek-v4-pro",
+    context: {
+      ...lightingContext,
+      selectedReference: lightingSearchBody.references[0],
+    },
+  }),
+}), env, lightingComposeMockFetch);
+assert.equal(lightingComposeResponse.status, 200);
+const lightingComposeBody = await lightingComposeResponse.json();
+assert.match(lightingComposeBody.prompt, /【创作需求】/);
+assert.match(lightingComposeBody.prompt, /【电影机参数】/);
+assert.equal(lightingComposeBody.meta.model, "deepseek-v4-pro");
 
 console.log("deepseek worker tests passed");
