@@ -754,54 +754,57 @@ body.dark .lighting-upload-preview.is-dragging {
   align-items: center;
 }
 
-.lighting-search-status {
+.lighting-status-icon {
   display: inline-flex;
-  gap: 7px;
   align-items: center;
-  min-height: 38px;
-  padding: 8px 11px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   border: 1px solid #ded8e7;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
   color: #5e5668;
-  font-size: 0.84rem;
-  font-weight: 740;
-  white-space: nowrap;
 }
 
-body.dark .lighting-search-status {
+body.dark .lighting-status-icon {
   border-color: #47404f;
   background: rgba(43, 40, 49, 0.76);
   color: #d9d1e4;
 }
 
-.lighting-search-status.is-loading {
+.lighting-status-icon i {
+  width: 17px;
+  height: 17px;
+}
+
+.lighting-status-icon.is-loading {
   color: #6f5f90;
 }
 
-body.dark .lighting-search-status.is-loading {
+body.dark .lighting-status-icon.is-loading {
   color: #d8c7ff;
 }
 
-.lighting-search-status.is-complete {
+.lighting-status-icon.is-complete {
   border-color: rgba(82, 151, 112, 0.38);
   background: rgba(232, 247, 238, 0.86);
   color: #2d6f49;
 }
 
-body.dark .lighting-search-status.is-complete {
+body.dark .lighting-status-icon.is-complete {
   border-color: rgba(111, 190, 144, 0.44);
   background: rgba(35, 68, 49, 0.54);
   color: #9ce3b9;
 }
 
-.lighting-search-status.is-error {
+.lighting-status-icon.is-error {
   border-color: rgba(177, 87, 87, 0.36);
   background: rgba(255, 239, 239, 0.82);
   color: #9a3c3c;
 }
 
-body.dark .lighting-search-status.is-error {
+body.dark .lighting-status-icon.is-error {
   border-color: rgba(220, 126, 126, 0.42);
   background: rgba(72, 38, 42, 0.56);
   color: #f0aaa9;

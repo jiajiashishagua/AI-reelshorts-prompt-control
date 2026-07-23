@@ -403,6 +403,8 @@ const DEFAULT_STATE = {
     aspectRatio: "9:16",
     searchStatus: "idle",
     searchError: "",
+    composeStatus: "idle",
+    composeError: "",
     extractionStatus: "idle",
     analysis: null,
     selectedDirection: "epic",
@@ -1485,7 +1487,7 @@ function renderLightingLab() {
             <div class="lighting-button-row">
               <button class="pf-button pf-primary" type="button" id="lightingSearchBtn" ${lab.searchStatus === "loading" ? "disabled" : ""}>
                 <i data-lucide="sparkles"></i>
-                ${lab.searchStatus === "loading" ? "分析中" : "AI分析并搜索参考图"}
+                AI分析并搜索参考图
               </button>
               ${renderLightingSearchStatus(lab)}
               <button class="pf-outline" type="button" id="lightingResetBtn">
@@ -1497,29 +1499,27 @@ function renderLightingLab() {
           </div>
         </section>
 
-        <section class="lighting-workflow-grid lighting-simple-workflow">
-          <div class="lighting-lab-card">
-            <div class="lighting-section-head">
-              <div>
-                <p class="eyebrow">Step 2</p>
-                <h3>AI推荐的参考图</h3>
-              </div>
-              <span>${lab.stills.length ? `${lab.stills.length} 张候选 / ${selectedStill ? "已选择 1 张" : "未选择"}` : "等待分析"}</span>
+        <section class="lighting-lab-card">
+          <div class="lighting-section-head">
+            <div>
+              <p class="eyebrow">Step 2</p>
+              <h3>AI推荐的参考图</h3>
             </div>
-            ${renderLightingAnalysisSummary(lab)}
-            ${renderLightingStillCandidates(lab)}
+            <span>${lab.stills.length ? `${lab.stills.length} 张候选 / ${selectedStill ? "已选择 1 张" : "未选择"}` : "等待分析"}</span>
           </div>
+          ${renderLightingAnalysisSummary(lab)}
+          ${renderLightingStillCandidates(lab)}
+        </section>
 
-          <div class="lighting-lab-card">
-            <div class="lighting-section-head">
-              <div>
-                <p class="eyebrow">Step 2</p>
-                <h3>光影控制</h3>
-              </div>
-              <span>按画面感觉调控</span>
+        <section class="lighting-lab-card lighting-control-card">
+          <div class="lighting-section-head">
+            <div>
+              <p class="eyebrow">Step 2</p>
+              <h3>光影控制</h3>
             </div>
-            ${renderLightingChoiceControls(lab)}
+            <span>按画面感觉调控</span>
           </div>
+          ${renderLightingChoiceControls(lab)}
         </section>
 
         <section class="lighting-lab-card lighting-final-card">
@@ -1531,7 +1531,8 @@ function renderLightingLab() {
             <div class="lighting-final-actions">
               <button class="pf-outline compact-project-button" type="button" id="lightingCopyBtn" ${lab.finalPrompt ? "" : "disabled"}><i data-lucide="copy"></i>复制</button>
               <button class="pf-outline compact-project-button" type="button" id="lightingSaveKnowledgeBtn" ${lab.finalPrompt ? "" : "disabled"}><i data-lucide="database"></i>存入光影资产</button>
-              <button class="pf-button pf-primary compact-project-button" type="button" id="lightingComposeBtn" ${canGenerate ? "" : "disabled"}><i data-lucide="wand-sparkles"></i>生成光影提示词</button>
+              <button class="pf-button pf-primary compact-project-button" type="button" id="lightingComposeBtn" ${canGenerate && lab.composeStatus !== "loading" ? "" : "disabled"}><i data-lucide="wand-sparkles"></i>生成光影提示词</button>
+              ${renderLightingComposeStatus(lab)}
             </div>
           </div>
           <textarea id="lightingFinalPrompt" class="lighting-final-textarea" placeholder="选择参考图和光影控制后，点击生成光影提示词。">${escapeHtml(lab.finalPrompt || "")}</textarea>
@@ -1545,28 +1546,49 @@ function renderLightingLab() {
 }
 
 function renderLightingSearchStatus(lab) {
-  const model = getTextModelOption(lab.targetModel);
   if (lab.searchStatus === "loading") {
     return `
-      <span class="lighting-search-status is-loading" role="status" aria-live="polite">
+      <span class="lighting-status-icon is-loading" role="status" aria-label="分析中" title="分析中">
         <span class="lighting-spinner" aria-hidden="true"></span>
-        ${escapeHtml(model.label)} 分析中
       </span>
     `;
   }
   if (lab.searchStatus === "ready") {
     return `
-      <span class="lighting-search-status is-complete" role="status" aria-live="polite">
-        <span aria-hidden="true">✅</span>
-        已完成
+      <span class="lighting-status-icon is-complete" role="status" aria-label="已完成" title="已完成">
+        <i data-lucide="check"></i>
       </span>
     `;
   }
   if (lab.searchStatus === "failed") {
     return `
-      <span class="lighting-search-status is-error" role="status" aria-live="polite">
+      <span class="lighting-status-icon is-error" role="status" aria-label="分析失败" title="${escapeHtml(lab.searchError || "分析失败")}">
         <i data-lucide="triangle-alert"></i>
-        分析失败
+      </span>
+    `;
+  }
+  return "";
+}
+
+function renderLightingComposeStatus(lab) {
+  if (lab.composeStatus === "loading") {
+    return `
+      <span class="lighting-status-icon is-loading" role="status" aria-label="生成中" title="生成中">
+        <span class="lighting-spinner" aria-hidden="true"></span>
+      </span>
+    `;
+  }
+  if (lab.composeStatus === "ready") {
+    return `
+      <span class="lighting-status-icon is-complete" role="status" aria-label="已完成" title="已完成">
+        <i data-lucide="check"></i>
+      </span>
+    `;
+  }
+  if (lab.composeStatus === "failed") {
+    return `
+      <span class="lighting-status-icon is-error" role="status" aria-label="生成失败" title="${escapeHtml(lab.composeError || "生成失败")}">
+        <i data-lucide="triangle-alert"></i>
       </span>
     `;
   }
@@ -3011,9 +3033,7 @@ function bindLightingLabEvents() {
 
   const headerGenerateButton = document.getElementById("generatePromptBtn");
   if (headerGenerateButton) headerGenerateButton.addEventListener("click", async () => {
-    await composeLightingFinalPrompt();
-    renderLightingLab();
-    refreshIcons();
+    await runLightingComposeAction();
   });
 
   const projectSelect = document.getElementById("lightingProjectSelect");
@@ -3117,6 +3137,7 @@ function bindLightingLabEvents() {
       lab.selectedStillId = button.dataset.selectLightingStill;
       lab.selectedExtractId = "";
       lab.finalPrompt = "";
+      markLightingComposeDraftChanged(lab);
       renderLightingLab();
       refreshIcons();
       showToast("已选择参考图");
@@ -3127,6 +3148,7 @@ function bindLightingLabEvents() {
     button.addEventListener("click", () => {
       lab.selectedDirection = button.dataset.lightingDirection;
       lab.finalPrompt = "";
+      markLightingComposeDraftChanged(lab);
       renderLightingLab();
       refreshIcons();
       saveState();
@@ -3141,6 +3163,7 @@ function bindLightingLabEvents() {
       lab.parameterControls[groupId] = button.dataset.lightingParam;
       lab.selectedIntensity = getLightingIntensityIdFromParameterControls(lab.parameterControls);
       lab.finalPrompt = "";
+      markLightingComposeDraftChanged(lab);
       renderLightingLab();
       refreshIcons();
       saveState();
@@ -3150,15 +3173,13 @@ function bindLightingLabEvents() {
   const finalPrompt = document.getElementById("lightingFinalPrompt");
   if (finalPrompt) finalPrompt.addEventListener("input", (event) => {
     lab.finalPrompt = event.target.value;
+    markLightingComposeDraftChanged(lab);
     saveState();
   });
 
   const composeButton = document.getElementById("lightingComposeBtn");
   if (composeButton) composeButton.addEventListener("click", async () => {
-    await composeLightingFinalPrompt();
-    renderLightingLab();
-    refreshIcons();
-    showToast("已生成最终光影提示词");
+    await runLightingComposeAction();
   });
 
   const copyButton = document.getElementById("lightingCopyBtn");
@@ -3182,6 +3203,38 @@ function bindLightingLabEvents() {
   });
 }
 
+async function runLightingComposeAction() {
+  const lab = getLightingLabState();
+  const canGenerate = Boolean(getLightingStill(lab.selectedStillId) && lab.selectedDirection && lab.selectedIntensity);
+  if (!canGenerate) {
+    await composeLightingFinalPrompt();
+    renderLightingLab();
+    refreshIcons();
+    return;
+  }
+  lab.composeStatus = "loading";
+  lab.composeError = "";
+  saveState();
+  renderLightingLab();
+  refreshIcons();
+  try {
+    await composeLightingFinalPrompt();
+    if (!lab.finalPrompt) throw new Error("生成结果为空");
+    lab.composeStatus = "ready";
+    lab.composeError = "";
+    saveState();
+    showToast("已生成最终光影提示词");
+  } catch (error) {
+    lab.composeStatus = "failed";
+    lab.composeError = error.message || "生成失败";
+    saveState();
+    showToast(lab.composeError);
+  } finally {
+    renderLightingLab();
+    refreshIcons();
+  }
+}
+
 function getLightingLabState() {
   if (!state.lightingLab) state.lightingLab = clone(DEFAULT_STATE.lightingLab);
   state.lightingLab.stills = Array.isArray(state.lightingLab.stills) ? state.lightingLab.stills : [];
@@ -3191,6 +3244,10 @@ function getLightingLabState() {
     ...(state.lightingLab.parameterControls || {}),
   };
   state.lightingLab.selectedIntensity = getLightingIntensityIdFromParameterControls(state.lightingLab.parameterControls);
+  state.lightingLab.searchStatus = state.lightingLab.searchStatus || "idle";
+  state.lightingLab.searchError = state.lightingLab.searchError || "";
+  state.lightingLab.composeStatus = state.lightingLab.composeStatus || "idle";
+  state.lightingLab.composeError = state.lightingLab.composeError || "";
   return state.lightingLab;
 }
 
@@ -3199,7 +3256,18 @@ function markLightingSearchDraftChanged(lab = getLightingLabState()) {
     lab.searchStatus = "idle";
     lab.searchError = "";
   }
+  if (lab.composeStatus !== "loading") {
+    lab.composeStatus = "idle";
+    lab.composeError = "";
+  }
   lab.finalPrompt = "";
+}
+
+function markLightingComposeDraftChanged(lab = getLightingLabState()) {
+  if (lab.composeStatus !== "loading") {
+    lab.composeStatus = "idle";
+    lab.composeError = "";
+  }
 }
 
 function handleLightingReferenceImage(file) {
