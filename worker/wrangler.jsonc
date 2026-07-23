@@ -9,6 +9,7 @@
   },
   "vars": {
     "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    "KIMI_BASE_URL": "https://api.moonshot.cn/v1",
     "ALLOWED_ORIGINS": "https://prompt.jiajiashishagua.online,http://127.0.0.1:8765,http://localhost:8765"
   },
   "observability": {

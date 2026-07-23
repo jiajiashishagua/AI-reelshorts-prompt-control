@@ -10,10 +10,11 @@ const runtimeUploads = {
 };
 
 const TEXT_MODEL_OPTIONS = [
-  { id: "local", label: "本地专业引擎", description: "不调用API，零成本生成。", available: true },
-  { id: "deepseek-v3", label: "DeepSeek V3（官方API已不可用）", description: "当前账户不再提供独立V3模型。", available: false },
-  { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", description: "速度快、成本低，推荐日常使用。", available: true },
-  { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", description: "适合复杂剧情与高精度方案。", available: true },
+  { id: "local", label: "本地专业引擎", description: "不调用API，零成本生成。", available: true, supportsThinking: false },
+  { id: "deepseek-v3", label: "DeepSeek V3（官方API已不可用）", description: "当前账户不再提供独立V3模型。", available: false, supportsThinking: false },
+  { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", description: "速度快、成本低，推荐日常使用。", available: true, supportsThinking: true },
+  { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", description: "适合复杂剧情与高精度方案。", available: true, supportsThinking: true },
+  { id: "kimi-k3", label: "Kimi K3", description: "Moonshot Kimi 通用文本模型，适合提示词生成、改写和长文本理解。", available: true, supportsThinking: false },
 ];
 
 if (!KNOWLEDGE_CORE || !KNOWLEDGE_INGESTION || !PERFORMANCE_DIRECTOR || !PERFORMANCE_PLANNER) {
@@ -1850,7 +1851,7 @@ function renderPerformancePlannerPanel() {
           </label>
           <label for="performanceThinkingSelect">
             <span>推理模式</span>
-            <select id="performanceThinkingSelect" ${state.workbench.textModelId === "local" ? "disabled" : ""}>
+            <select id="performanceThinkingSelect" ${getTextModelOption(state.workbench.textModelId).supportsThinking ? "" : "disabled"}>
               <option value="false" ${state.workbench.textModelThinking ? "" : "selected"}>标准</option>
               <option value="true" ${state.workbench.textModelThinking ? "selected" : ""}>深度思考</option>
             </select>
@@ -2580,7 +2581,7 @@ function bindWorkbenchEvents() {
       const model = getTextModelOption(event.target.value);
       if (!model?.available) return;
       wb.textModelId = model.id;
-      if (model.id === "local") wb.textModelThinking = false;
+      if (!model.supportsThinking) wb.textModelThinking = false;
       saveState();
       renderWorkbench();
       refreshIcons();

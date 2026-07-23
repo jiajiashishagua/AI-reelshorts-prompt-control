@@ -1,17 +1,18 @@
-# DeepSeek 文本模型部署
+# 文本模型网关部署
 
 ## 架构
 
 ```text
-网页工作台 -> Cloudflare Pages Function / Worker -> DeepSeek 官方 API
+网页工作台 -> Cloudflare Pages Function / Worker -> DeepSeek / Kimi 官方 API
 ```
 
-浏览器只访问云端网关，不保存或传递 DeepSeek API Key。网关从 Cloudflare Secret 中读取密钥，校验请求来源、模型和输入大小后，再调用 DeepSeek。生产环境使用 `pages.dev`，避免中国大陆网络对 `workers.dev` 的 DNS 污染。
+浏览器只访问云端网关，不保存或传递任何模型 API Key。网关从 Cloudflare Secret 中读取密钥，校验请求来源、模型和输入大小后，再调用对应供应商。生产环境使用 `pages.dev`，避免中国大陆网络对 `workers.dev` 的 DNS 污染。
 
 ## 可用模型
 
 - `deepseek-v4-flash`：日常生成，速度与成本优先。
 - `deepseek-v4-pro`：复杂剧情、细节推演与高精度方案。
+- `kimi-k3`：Moonshot Kimi 通用文本模型，适合提示词生成、改写和长文本理解。
 - 深度思考：两种 V4 模型都可以在工作台切换“标准生成 / 深度思考”。
 - DeepSeek V3：当前官方账户模型列表不再提供独立 V3，因此网页保留禁用提示，不伪装成其他模型。
 
@@ -27,6 +28,8 @@ npx wrangler dev
 
 ```dotenv
 DEEPSEEK_API_KEY=替换为你的密钥
+KIMI_API_KEY=替换为你的密钥
+KIMI_BASE_URL=https://api.moonshot.cn/v1
 SERPAPI_API_KEY=可选，用于光影生成器联网搜索电影静帧
 BING_IMAGE_SEARCH_KEY=可选，用于光影生成器联网搜索电影静帧
 BING_IMAGE_SEARCH_ENDPOINT=https://api.bing.microsoft.com/v7.0/images/search
@@ -49,6 +52,7 @@ npx wrangler deploy
 cd worker
 npx wrangler pages project create prompt-control-deepseek-api --production-branch main
 npx wrangler pages secret put DEEPSEEK_API_KEY --project-name prompt-control-deepseek-api
+npx wrangler pages secret put KIMI_API_KEY --project-name prompt-control-deepseek-api
 npm run deploy:pages
 ```
 
@@ -100,6 +104,13 @@ Pages 项目轮换 Secret：
 ```powershell
 cd worker
 npx wrangler pages secret put DEEPSEEK_API_KEY --project-name prompt-control-deepseek-api
+```
+
+Kimi 密钥轮换：
+
+```powershell
+cd worker
+npx wrangler pages secret put KIMI_API_KEY --project-name prompt-control-deepseek-api
 ```
 
 光影生成器如果要显示真实电影静帧缩略图，还需要额外配置一个图片搜索服务，二选一即可：

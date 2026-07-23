@@ -6,14 +6,19 @@ import {
   renderFallbackLightingPrompt,
   sanitizeLightingContext,
   sanitizePerformanceContext,
+  TEXT_MODELS,
 } from "../worker/src/index.mjs";
 
 const origin = "https://prompt.jiajiashishagua.online";
 const env = {
   DEEPSEEK_API_KEY: "test-secret",
   DEEPSEEK_BASE_URL: "https://api.deepseek.com",
+  KIMI_API_KEY: "test-kimi-secret",
+  KIMI_BASE_URL: "https://api.moonshot.cn/v1",
   ALLOWED_ORIGINS: `${origin},http://127.0.0.1:8765`,
 };
+
+assert.ok(TEXT_MODELS["kimi-k3"]);
 
 const context = {
   input: {
@@ -74,7 +79,7 @@ assert.equal(healthResponse.status, 200);
 const health = await healthResponse.json();
 assert.equal(health.ok, true);
 assert.equal(health.v3Available, false);
-assert.deepEqual(health.models.map((item) => item.id), ["deepseek-v4-flash", "deepseek-v4-pro"]);
+assert.deepEqual(health.models.map((item) => item.id), ["deepseek-v4-flash", "deepseek-v4-pro", "kimi-k3"]);
 
 const blockedResponse = await handleRequest(new Request("https://worker.example/api/models", {
   headers: { Origin: "https://attacker.example" },
@@ -162,6 +167,29 @@ const invalidModelResponse = await handleRequest(new Request("https://worker.exa
   body: JSON.stringify({ model: "deepseek-v3", context }),
 }), env, mockFetch);
 assert.equal(invalidModelResponse.status, 400);
+
+const kimiPerformanceResponse = await handleRequest(new Request("https://worker.example/api/performance-plans", {
+  method: "POST",
+  headers: {
+    Origin: origin,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "kimi-k3",
+    thinking: true,
+    context,
+  }),
+}), env, mockFetch);
+assert.equal(kimiPerformanceResponse.status, 200);
+const kimiPerformanceBody = await kimiPerformanceResponse.json();
+assert.equal(kimiPerformanceBody.meta.provider, "kimi");
+assert.equal(kimiPerformanceBody.meta.thinking, false);
+assert.equal(upstreamRequest.url, "https://api.moonshot.cn/v1/chat/completions");
+assert.equal(upstreamRequest.options.headers.Authorization, "Bearer test-kimi-secret");
+assert.equal(upstreamRequest.body.model, "kimi-k3");
+assert.equal(upstreamRequest.body.temperature, 1);
+assert.equal("max_completion_tokens" in upstreamRequest.body, true);
+assert.equal("max_tokens" in upstreamRequest.body, false);
 
 const lightingContext = sanitizeLightingContext({
   sourceBrief: "女主在夜色窗边压住愤怒，准备说出真相。",

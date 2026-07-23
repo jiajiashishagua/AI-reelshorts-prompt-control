@@ -3,12 +3,28 @@ const DEEPSEEK_MODELS = Object.freeze({
     id: "deepseek-v4-flash",
     label: "DeepSeek V4 Flash",
     description: "速度更快、成本更低，适合日常提示词与表演方案生成。",
+    provider: "deepseek",
   },
   "deepseek-v4-pro": {
     id: "deepseek-v4-pro",
     label: "DeepSeek V4 Pro",
     description: "复杂推理和长上下文能力更强，适合高精度方案。",
+    provider: "deepseek",
   },
+});
+
+const KIMI_MODELS = Object.freeze({
+  "kimi-k3": {
+    id: "kimi-k3",
+    label: "Kimi K3",
+    description: "Moonshot Kimi 最新通用文本模型，适合提示词生成、改写和长文本理解。",
+    provider: "kimi",
+  },
+});
+
+const TEXT_MODELS = Object.freeze({
+  ...DEEPSEEK_MODELS,
+  ...KIMI_MODELS,
 });
 
 const STRATEGY_DEFAULTS = [
@@ -43,6 +59,31 @@ function unique(values) {
 
 function normalizeText(value, maxLength = 20_000) {
   return String(value || "").trim().slice(0, maxLength);
+}
+
+function getModelConfig(model) {
+  return TEXT_MODELS[model] || null;
+}
+
+function getProviderConfig(env, model) {
+  const modelConfig = getModelConfig(model);
+  if (!modelConfig) throw new Error("不支持的模型");
+  if (modelConfig.provider === "kimi") {
+    if (!env.KIMI_API_KEY) throw new Error("云端未配置KIMI_API_KEY");
+    return {
+      provider: "kimi",
+      label: "Kimi",
+      apiKey: env.KIMI_API_KEY,
+      baseUrl: env.KIMI_BASE_URL || "https://api.moonshot.cn/v1",
+    };
+  }
+  if (!env.DEEPSEEK_API_KEY) throw new Error("云端未配置DEEPSEEK_API_KEY");
+  return {
+    provider: "deepseek",
+    label: "DeepSeek",
+    apiKey: env.DEEPSEEK_API_KEY,
+    baseUrl: env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+  };
 }
 
 function getAllowedOrigins(env) {
@@ -418,47 +459,74 @@ async function callDeepSeek(env, model, thinking, context, fetcher) {
 }
 
 async function callDeepSeekJson(env, model, messages, options = {}, fetcher = fetch) {
-  if (!env.DEEPSEEK_API_KEY) throw new Error("云端未配置DEEPSEEK_API_KEY");
+  return callTextModelJson(env, model, messages, options, fetcher);
+}
+
+async function callTextModelJson(env, model, messages, options = {}, fetcher = fetch) {
+  const providerConfig = getProviderConfig(env, model);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const requestBody = {
+    model,
+    messages,
+    response_format: { type: "json_object" },
+    stream: false,
+  };
+  if (providerConfig.provider === "kimi") {
+    requestBody.max_completion_tokens = options.maxTokens || 4_000;
+    requestBody.temperature = 1;
+  } else {
+    requestBody.max_tokens = options.maxTokens || 4_000;
+    requestBody.temperature = options.temperature ?? 0.35;
+  }
   try {
-    const response = await fetcher(`${env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"}/chat/completions`, {
+    const response = await fetcher(`${providerConfig.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${env.DEEPSEEK_API_KEY}`,
+        "Authorization": `Bearer ${providerConfig.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        response_format: { type: "json_object" },
-        max_tokens: options.maxTokens || 4_000,
-        temperature: options.temperature ?? 0.35,
-        stream: false,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message = data?.error?.message || `DeepSeek请求失败（${response.status}）`;
+      const message = data?.error?.message || `${providerConfig.label}请求失败（${response.status}）`;
       const error = new Error(message);
       error.status = response.status >= 500 ? 502 : response.status;
       throw error;
     }
     const content = data?.choices?.[0]?.message?.content;
-    if (!content) throw new Error("DeepSeek返回了空内容");
+    if (!content) throw new Error(`${providerConfig.label}返回了空内容`);
     try {
       return {
         data: JSON.parse(content),
         usage: data.usage || null,
         requestId: data.id || "",
+        provider: providerConfig.provider,
       };
     } catch {
-      throw new Error("DeepSeek返回内容不是有效JSON");
+      throw new Error(`${providerConfig.label}返回内容不是有效JSON`);
     }
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+async function callTextModelForPlans(env, model, thinking, context, fetcher) {
+  const modelConfig = getModelConfig(model);
+  if (!modelConfig) throw new Error("不支持的模型");
+  if (modelConfig.provider === "deepseek") return callDeepSeek(env, model, thinking, context, fetcher);
+  const result = await callTextModelJson(env, model, buildPerformanceMessages(context), {
+    maxTokens: 6_000,
+    temperature: 0.35,
+  }, fetcher);
+  return {
+    plans: normalizePlans(result.data, context),
+    usage: result.usage,
+    requestId: result.requestId,
+    provider: result.provider,
+  };
 }
 
 function normalizeLightingAnalysisPayload(payload, context) {
@@ -642,17 +710,19 @@ async function handlePerformancePlans(request, env, origin, fetcher) {
   }
   if (JSON.stringify(body).length > MAX_REQUEST_BYTES) return jsonResponse({ error: "请求内容过大" }, 413, origin, env);
   const model = normalizeText(body.model, 80);
-  if (!DEEPSEEK_MODELS[model]) return jsonResponse({ error: "不支持的模型" }, 400, origin, env);
+  const modelConfig = getModelConfig(model);
+  if (!modelConfig) return jsonResponse({ error: "不支持的模型" }, 400, origin, env);
   const context = sanitizePerformanceContext(body.context || {});
   if (!context.brief) return jsonResponse({ error: "请先提供剧情或画面描述" }, 400, origin, env);
+  const thinking = modelConfig.provider === "deepseek" && Boolean(body.thinking);
   try {
-    const result = await callDeepSeek(env, model, Boolean(body.thinking), context, fetcher);
+    const result = await callTextModelForPlans(env, model, thinking, context, fetcher);
     return jsonResponse({
       plans: result.plans,
       meta: {
-        provider: "deepseek",
+        provider: modelConfig.provider,
         model,
-        thinking: Boolean(body.thinking),
+        thinking,
         usage: result.usage,
         requestId: result.requestId,
       },
@@ -674,7 +744,8 @@ async function handleLightingSearchReferences(request, env, origin, fetcher) {
   }
   if (JSON.stringify(body).length > MAX_REQUEST_BYTES) return jsonResponse({ error: "请求内容过大" }, 413, origin, env);
   const model = normalizeText(body.model, 80) || "deepseek-v4-flash";
-  if (!DEEPSEEK_MODELS[model]) return jsonResponse({ error: "不支持的模型" }, 400, origin, env);
+  const modelConfig = getModelConfig(model);
+  if (!modelConfig) return jsonResponse({ error: "不支持的模型" }, 400, origin, env);
   const context = sanitizeLightingContext(body.context || {});
   if (!context.sourceBrief && !context.requirement && !context.referenceImageUploaded) {
     return jsonResponse({ error: "请先上传场景图，或填写剧本和需求" }, 400, origin, env);
@@ -690,7 +761,7 @@ async function handleLightingSearchReferences(request, env, origin, fetcher) {
     }, fetcher);
     searchPlan = normalizeLightingAnalysisPayload(result.data, context);
     modelMeta = {
-      provider: "deepseek",
+      provider: modelConfig.provider,
       model,
       usage: result.usage,
       requestId: result.requestId,
@@ -725,7 +796,8 @@ async function handleLightingComposePrompt(request, env, origin, fetcher) {
   }
   if (JSON.stringify(body).length > MAX_REQUEST_BYTES) return jsonResponse({ error: "请求内容过大" }, 413, origin, env);
   const model = normalizeText(body.model, 80) || "deepseek-v4-flash";
-  if (!DEEPSEEK_MODELS[model]) return jsonResponse({ error: "不支持的模型" }, 400, origin, env);
+  const modelConfig = getModelConfig(model);
+  if (!modelConfig) return jsonResponse({ error: "不支持的模型" }, 400, origin, env);
   const context = sanitizeLightingContext(body.context || {});
   if (!context.selectedReference) return jsonResponse({ error: "请先选择一张参考图" }, 400, origin, env);
   if (!context.sourceBrief && !context.requirement) return jsonResponse({ error: "请先填写剧本或光影需求" }, 400, origin, env);
@@ -740,7 +812,7 @@ async function handleLightingComposePrompt(request, env, origin, fetcher) {
     return jsonResponse({
       prompt,
       meta: {
-        provider: "deepseek",
+        provider: modelConfig.provider,
         model,
         usage: result.usage,
         requestId: result.requestId,
@@ -768,14 +840,14 @@ export async function handleRequest(request, env, fetcher = fetch) {
   if (request.method === "GET" && url.pathname === "/health") {
     return jsonResponse({
       ok: true,
-      provider: "deepseek",
-      models: Object.values(DEEPSEEK_MODELS),
+      provider: "multi-provider",
+      models: Object.values(TEXT_MODELS),
       v3Available: false,
     }, 200, origin, env);
   }
   if (request.method === "GET" && url.pathname === "/api/models") {
     if (!isAllowedOrigin(origin, env)) return jsonResponse({ error: "来源域名未授权" }, 403, origin, env);
-    return jsonResponse({ models: Object.values(DEEPSEEK_MODELS), v3Available: false }, 200, origin, env);
+    return jsonResponse({ models: Object.values(TEXT_MODELS), v3Available: false }, 200, origin, env);
   }
   if (!isAllowedOrigin(origin, env)) return jsonResponse({ error: "来源域名未授权" }, 403, origin, env);
   if (request.method === "POST" && url.pathname === "/api/performance-plans") {
@@ -792,6 +864,8 @@ export async function handleRequest(request, env, fetcher = fetch) {
 
 export {
   DEEPSEEK_MODELS,
+  KIMI_MODELS,
+  TEXT_MODELS,
   buildDeepSeekRequest,
   buildFallbackLightingSearchPlan,
   normalizePlans,
