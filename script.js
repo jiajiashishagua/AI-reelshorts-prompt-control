@@ -402,6 +402,7 @@ const DEFAULT_STATE = {
     targetModel: "deepseek-v4-flash",
     aspectRatio: "9:16",
     searchStatus: "idle",
+    searchError: "",
     extractionStatus: "idle",
     analysis: null,
     selectedDirection: "epic",
@@ -1482,10 +1483,11 @@ function renderLightingLab() {
               <input id="lightingReferenceImage" type="file" accept="image/*" hidden />
             </div>
             <div class="lighting-button-row">
-              <button class="pf-button pf-primary" type="button" id="lightingSearchBtn">
+              <button class="pf-button pf-primary" type="button" id="lightingSearchBtn" ${lab.searchStatus === "loading" ? "disabled" : ""}>
                 <i data-lucide="sparkles"></i>
-                AI分析并搜索参考图
+                ${lab.searchStatus === "loading" ? "分析中" : "AI分析并搜索参考图"}
               </button>
+              ${renderLightingSearchStatus(lab)}
               <button class="pf-outline" type="button" id="lightingResetBtn">
                 <i data-lucide="rotate-ccw"></i>
                 重置
@@ -1540,6 +1542,35 @@ function renderLightingLab() {
   `;
 
   bindLightingLabEvents();
+}
+
+function renderLightingSearchStatus(lab) {
+  const model = getTextModelOption(lab.targetModel);
+  if (lab.searchStatus === "loading") {
+    return `
+      <span class="lighting-search-status is-loading" role="status" aria-live="polite">
+        <span class="lighting-spinner" aria-hidden="true"></span>
+        ${escapeHtml(model.label)} 分析中
+      </span>
+    `;
+  }
+  if (lab.searchStatus === "ready") {
+    return `
+      <span class="lighting-search-status is-complete" role="status" aria-live="polite">
+        <span aria-hidden="true">✅</span>
+        已完成
+      </span>
+    `;
+  }
+  if (lab.searchStatus === "failed") {
+    return `
+      <span class="lighting-search-status is-error" role="status" aria-live="polite">
+        <i data-lucide="triangle-alert"></i>
+        分析失败
+      </span>
+    `;
+  }
+  return "";
 }
 
 function renderLightingStepStrip() {
@@ -2999,24 +3030,30 @@ function bindLightingLabEvents() {
   const modelSelect = document.getElementById("lightingModelSelect");
   if (modelSelect) modelSelect.addEventListener("change", (event) => {
     lab.targetModel = event.target.value;
+    markLightingSearchDraftChanged(lab);
     saveState();
+    renderLightingLab();
+    refreshIcons();
   });
 
   const aspectSelect = document.getElementById("lightingAspectRatio");
   if (aspectSelect) aspectSelect.addEventListener("change", (event) => {
     lab.aspectRatio = event.target.value;
+    markLightingSearchDraftChanged(lab);
     saveState();
   });
 
   const sourceBrief = document.getElementById("lightingSourceBrief");
   if (sourceBrief) sourceBrief.addEventListener("input", (event) => {
     lab.sourceBrief = event.target.value;
+    markLightingSearchDraftChanged(lab);
     saveState();
   });
 
   const requirement = document.getElementById("lightingRequirement");
   if (requirement) requirement.addEventListener("input", (event) => {
     lab.requirement = event.target.value;
+    markLightingSearchDraftChanged(lab);
     saveState();
   });
 
@@ -3053,13 +3090,22 @@ function bindLightingLabEvents() {
   const searchButton = document.getElementById("lightingSearchBtn");
   if (searchButton) searchButton.addEventListener("click", async () => {
     lab.searchStatus = "loading";
+    lab.searchError = "";
     saveState();
     renderLightingLab();
     refreshIcons();
-    await analyzeAndSearchLightingReferences();
-    renderLightingLab();
-    refreshIcons();
-    showToast("已完成分析并生成 5 张参考图");
+    try {
+      await analyzeAndSearchLightingReferences();
+      showToast("已完成分析并生成 5 张参考图");
+    } catch (error) {
+      lab.searchStatus = "failed";
+      lab.searchError = error.message || "分析失败";
+      saveState();
+      showToast(lab.searchError);
+    } finally {
+      renderLightingLab();
+      refreshIcons();
+    }
   });
 
   document.querySelectorAll("[data-open-still-search]").forEach((button) => {
@@ -3148,11 +3194,20 @@ function getLightingLabState() {
   return state.lightingLab;
 }
 
+function markLightingSearchDraftChanged(lab = getLightingLabState()) {
+  if (lab.searchStatus !== "loading") {
+    lab.searchStatus = "idle";
+    lab.searchError = "";
+  }
+  lab.finalPrompt = "";
+}
+
 function handleLightingReferenceImage(file) {
   const lab = getLightingLabState();
   if (!file) {
     lab.referenceImageName = "";
     runtimeUploads.lightingReferenceImageUrl = "";
+    markLightingSearchDraftChanged(lab);
     saveState();
     renderLightingLab();
     refreshIcons();
@@ -3163,6 +3218,7 @@ function handleLightingReferenceImage(file) {
     return;
   }
   lab.referenceImageName = file.name;
+  markLightingSearchDraftChanged(lab);
   const reader = new FileReader();
   reader.onload = () => {
     runtimeUploads.lightingReferenceImageUrl = String(reader.result || "");
